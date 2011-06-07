@@ -379,7 +379,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
                     if self.settings.masking != 'None': self.nextPhase = "mask"
                     else: self.nextPhase = "interval"
                     if self.settings.enableEyeTracker:
-                        self.settings.eyetracker.startStim(self.atImage) # TODO: make eyetracker work!                        
+                        self.settings.eyetracker.startStim(stimname)                        
 
             self.response = 'None'
             self.responsetime = 0
@@ -407,9 +407,6 @@ class slideshow(QtGui.QFrame, slideshowUi):
                 self.settings.eyetracker.stopStim()
                 self.trackerData = 'Tracker data:\n'+\
                     self.settings.eyetracker.getData()
-                eyetrackfile = open('eyetracker.dat','w')
-                eyetrackfile.write(self.trackerData)
-                eyetrackfile.close()
             self.writeOutput()
                         
     def writeOutput(self):
@@ -508,6 +505,23 @@ class slideshow(QtGui.QFrame, slideshowUi):
             print 'Done! Closing output file'
             self.csv.close()
             self.arff.close()
+            
+        if self.settings.enableEyeTracker:
+            eyetrackname = self.outputdir+self.subject.name+self.date+'.eye'
+            eyetrackfile = open(eyetrackname,'w')
+            from win32api import GetSystemMetrics
+            import re
+            width = GetSystemMetrics (0)
+            height = GetSystemMetrics (1)
+            txtcoords = re.findall(r'FPOGX="([\d\.]*).*FPOGY="([\d\.]*).*STIM([\d]*)',\
+                                    self.trackerData)
+            for x,y,name in txtcoords:
+                fixed = [name, float(x)*width, float(y)*height]
+                eyetrackfile.write('\t'.join(fixed))
+                
+            eyetrackfile.write(self.trackerData)
+            eyetrackfile.close()            
+            
         else:
             print 'No brain activity or user data recorded, no output file created'
         self.quitApp()
