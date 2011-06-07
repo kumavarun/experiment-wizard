@@ -16,7 +16,7 @@ class tracker:
                 
     def connect(self):
         sock = socket(AF_INET, SOCK_STREAM)
-        print '* Socket created' 
+        #print '* Socket created' 
         try:
             sock.connect(('localhost', 4242))
             sock.settimeout(5.0)
@@ -73,7 +73,7 @@ class tracker:
             try:
                 data = self.sock.recv(1024)
             except: break
-            print '--\n', data, '##'
+            #print '--\n', data, '##'
             if stop in data:
                 alldata.append(data[:data.find(stop)])
                 break
