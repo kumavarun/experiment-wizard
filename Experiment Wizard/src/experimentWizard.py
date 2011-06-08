@@ -20,12 +20,12 @@ class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.15' ### 28/04/2011 ###
+            self.version = '1.16' ### 08/06/2011 ###
             
             self.parent = parent
             self.app = app
             self.statusbar = self.statusBar()
-            self.statusbar.showMessage("Welcome!", 2500)            
+            self.statusbar.showMessage("Welcome!", 3500)            
             if os.path.exists('stats.cfg'):
                 statsfile = open('stats.cfg', 'r')
                 self.stats = pickle.load(statsfile)

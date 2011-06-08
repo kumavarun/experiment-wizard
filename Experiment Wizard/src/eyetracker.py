@@ -59,7 +59,7 @@ class tracker:
     def startStim(self,stimname):
         self.sock.send('<SET ID="ENABLE_SEND_DATA" STATE="1" />\r\n')
         self.sock.send('<SET ID="GPI_NUMBER" VALUE="1" />\r\n')    
-        self.sock.send('<SET ID="GPI1" VALUE="STIM%s" />\r\n' % stimname)        
+        self.sock.send('<SET ID="GPI1" VALUE="%s" />\r\n' % stimname)        
         
     def stopStim(self):
         self.sock.send('<SET ID="ENABLE_SEND_DATA" STATE="0" />\r\n')
