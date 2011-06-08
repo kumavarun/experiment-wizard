@@ -336,7 +336,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
             
             # VIDEO and AUDIO            
             if str(extension) in slideshow.mediatypes:
-                print 'Presenting %s' % stimname
+                print 'Presenting %s' % os.path.basename(stimname)
                 self.playingAV = True
                 media = Phonon.MediaSource(stimname)                 
                 self.vp.load(media)
@@ -372,14 +372,14 @@ class slideshow(QtGui.QFrame, slideshowUi):
                         self.settings.eyetracker.stopStim()
                     action = False
                 elif self.nextPhase =='stimulus' and action:
-                    print 'Presenting %s' % stimname
+                    print 'Presenting %s' % os.path.basename(stimname)
                     stimulus = QtGui.QMovie(stimname,QtCore.QByteArray(), self) 
                     self.disp.setMovie(stimulus)
                     stimulus.start()
                     if self.settings.masking != 'None': self.nextPhase = "mask"
                     else: self.nextPhase = "interval"
                     if self.settings.enableEyeTracker:
-                        self.settings.eyetracker.startStim(stimname)                        
+                        self.settings.eyetracker.startStim(os.path.basename(stimname))                        
 
             self.response = 'None'
             self.responsetime = 0
@@ -513,13 +513,16 @@ class slideshow(QtGui.QFrame, slideshowUi):
             import re
             width = GetSystemMetrics (0)
             height = GetSystemMetrics (1)
-            txtcoords = re.findall(r'FPOGX="([\d\.]*).*FPOGY="([\d\.]*).*STIM([\d]*)',\
-                                    self.trackerData)
+            txtcoords = re.findall(\
+                r'FPOGX="([\d\.-]*).*FPOGY="([\d\.-]*).*FPOGV="1" GPI1="([^"]*)',\
+                self.trackerData)
+            print self.trackerData
+            print txtcoords
             for x,y,name in txtcoords:
-                fixed = [name, float(x)*width, float(y)*height]
-                eyetrackfile.write('\t'.join(fixed))
+                fixed = [os.path.basename(name), str(int(float(x)*width)),\
+                          str(int(float(y)*height))]
+                eyetrackfile.write('\t'.join(fixed)+'\n')
                 
-            eyetrackfile.write(self.trackerData)
             eyetrackfile.close()            
             
         else:
