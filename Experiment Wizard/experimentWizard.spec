@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 a = Analysis([os.path.join(HOMEPATH,'support\\_mountzlib.py'), os.path.join(HOMEPATH,'support\\useUnicode.py'), 'src\\experimentWizard.py'],
-             pathex=['C:\\Users\\Junuxx\\Eclipse workspace\\Experiment Wizard'])
+             pathex=['C:\\Users\\J\\workspace\\Experiment Wizard'])
 pyz = PYZ(a.pure)
 exe = EXE( pyz,
           a.scripts,

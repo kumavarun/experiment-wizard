@@ -20,12 +20,14 @@ class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.16' ### 08/06/2011 ###
+            self.version = '1.17' ### 08/06/2011 ###
+            print 'Starting Experiment Wizard %s' % self.version
             
             self.parent = parent
             self.app = app
             self.statusbar = self.statusBar()
-            self.statusbar.showMessage("Welcome!", 3500)            
+            self.statusbar.showMessage("Welcome!", 3500)     
+            print ' Loading statistics..'       
             if os.path.exists('stats.cfg'):
                 statsfile = open('stats.cfg', 'r')
                 self.stats = pickle.load(statsfile)
@@ -34,9 +36,10 @@ class ExperimentWizard(QMainWindow):
             else:
                 self.stats = stats(datetime.datetime.now()) 
                 
-            
+            print ' Initializing user interface..'
             self.ui = gui.experimentWizardUi()
             self.ui.setupUi(self)
+            print ' Loading configuration..'
             self.settings = Settings(self)
             self.deletedStim = -1           # index of last deleted stimulus
             self.deletedSubj = -1           # index of last deleted subject
@@ -80,9 +83,14 @@ class ExperimentWizard(QMainWindow):
             
             # connect to eye tracker
             self.eyeTracker = None
-            if self.settings.haveEyeTracker:
-                #self.eyeTracker = eyetracker.tracker()
-                self.settings.eyetracker = eyetracker.tracker() 
+            if self.settings.haveEyeTracker: # check if eye tracker software is installed
+                try:                         # try connecting
+                    print ' Establishing connection to eye tracker..'
+                    self.settings.eyetracker = eyetracker.tracker()
+                except:                      # eye tracker installed but not connected
+                    self.settings.haveEyeTracker = False
+            
+            print 'Started successfully!'
             
         def reset(self):
             self.settings.reset(self)
@@ -533,10 +541,12 @@ class ExperimentWizard(QMainWindow):
             if haveTracker: eyetracker = True
             
             # TODO: return dictionary
-            return [edk, consumer_version, testbench, eyetracker]
+            keys = [edk, consumer_version, testbench, eyetracker]
+            #print keys
+            return keys 
             
         def controlPanel(self):
-            keys = self.settings.haveEDK
+            keys = self.getKeys()
             if keys[0] == '':   # no EDK found, try Consumer Version
                 if keys[1] == '':
                     self.statusbar.showMessage("Emotiv Control Panel not found", 3000)
@@ -553,9 +563,14 @@ class ExperimentWizard(QMainWindow):
         def testBench(self):
             keys = self.getKeys()
             if keys[2] == '':
-                self.statusbar.showMessage("Emotiv Testbench not found", 3000)
-                return
-            keys = keys[2][0]+'\TestBench.exe'
+                if os.path.exists(keys[0][0]+'\Testbench.exe'):
+                    loc = keys[0][0]
+                elif keys[0] == '':
+                    self.statusbar.showMessage("Emotiv Testbench not found", 3000)    
+                    return
+            else:
+                loc = keys[2][0]
+            keys = loc + '\TestBench.exe'
             self.statusbar.showMessage("Starting Emotiv Testbench...", 3000)
             subprocess.Popen(keys)
             

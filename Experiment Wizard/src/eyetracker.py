@@ -21,7 +21,7 @@ class tracker:
             sock.connect(('localhost', 4242))
             sock.settimeout(5.0)
         except Exception as e:
-            print '! Error connecting to server:', e
+            print ' Eyetracker software found, but device seems to be offline!'
         return sock
     
     def calibrate(self):

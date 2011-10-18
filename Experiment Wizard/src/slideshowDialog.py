@@ -36,7 +36,7 @@ except:
 
 
 class slideshow(QtGui.QFrame, slideshowUi):   
-    movietypes = "*.avi *.mp4 *.mpg *.mpeg *.mov *.wmv *.mp3 *.wav"
+    movietypes = "*.avi *.mp4 *.mpg *.mpeg *.mov *.wmv"
     audiotypes = "*.mp3 *.wav"    
     mediatypes = movietypes+' '+audiotypes
     
@@ -79,12 +79,12 @@ class slideshow(QtGui.QFrame, slideshowUi):
                     self.masks.append(os.path.join(str(settings.maskfolder),f))
             if settings.randomizeMasks:
                 random.shuffle(self.masks)
-        print '%s masks found in %s' % (len(self.masks), settings.maskfolder)
-        if 'space' in settings.masklength:
-            self.maskLength = 60e3
-        else:
-            m = match('[\d\.]+', settings.masklength)            
-            self.maskLength = int(1000*float(m.group()))
+            print '%s masks found in %s' % (len(self.masks), settings.maskfolder)
+            if 'space' in settings.masklength:
+                self.maskLength = 60e3
+            else:
+                m = match('[\d\.]+', settings.masklength)            
+                self.maskLength = int(1000*float(m.group()))
         
         self.subject = subject
         self.disp.setText(self.txt('Now recording subject '+str(self.subject.name)))
@@ -129,7 +129,29 @@ class slideshow(QtGui.QFrame, slideshowUi):
         if connected == 0x0000:
             print 'Connected to EmoEngine!'
         else:
-            print 'Failed to connect to EmoEngine'
+            errors = {
+                0x0001: 'Unknown error',
+                0x0101: 'Invalid profile',
+                0x0102: 'No user profile',
+                0x0200: 'No signal',
+                0x0300: 'Buffer too small',
+                0x0301: 'Parameter out of range',
+                0x0302: 'Invalid parameter',
+                0x0303: 'Parameter locked',
+                0x0304: 'Invalid training action',
+                0x0305: 'Invalid training control',
+                0x0306: 'Invalid active action',
+                0x0307: 'Excess max actions',
+                0x0308: 'No signature available',
+                0x0400: 'Invalid user ID',
+                0x0500: 'EmoEngine uninitialized',
+                0x0501: 'EmoEngine disconnected',
+                0x0502: 'Proxy error',
+                0x0600: 'No event',
+                0x0700: 'Gyro not calibrated',
+                0x0800: 'Optimization is on'
+            }
+            print('Failed to connect to EmoEngine: '+ errors[connected] ) 
             self.online = False
 
         # Intro/countdown
@@ -173,11 +195,15 @@ class slideshow(QtGui.QFrame, slideshowUi):
         return s
 
     def countdown(self):
-        self.iCountdown -= 1
+        if self.iCountdown > 0:
+            self.iCountdown -= 1
         self.disp.setText(self.txt('Starting in '+str(self.iCountdown)))
+        if self.iCountdown < -1:
+            print 'Error during experiment startup'
+            return -1
 
         # initialize data collection now
-        if self.iCountdown == 0:
+        if self.iCountdown <= 0:
 
             # Setup EDK interface
             self.eventHandle = edk.EE_EmoEngineEventCreate()
@@ -416,7 +442,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
             ##############################################
         
         print 'Saving data...'
-        wavebands = ['alpha', 'beta', 'delta', 'theta']
+        wavebands = ['average', 'alpha', 'beta', 'delta', 'theta']
 
         if self.online or self.recordKeys:
             self.csv = open(self.csvname,'w')
@@ -495,7 +521,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
                 if self.online:
                     for channel in stimulus['channels']:
                         channeldata = stimulus['channels'][channel]
-                        bandscores = doFFT(channeldata, channel)
+                        bandscores = doFFT(channeldata, channel) # TODO: avg
                         for waveband in bandscores:
                             csv = ';'.join([csv,str(bandscores[waveband])])
                             arff = ','.join([arff,str(bandscores[waveband])])

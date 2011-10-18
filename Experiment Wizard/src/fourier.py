@@ -29,7 +29,8 @@ def doFFT(input, description):
         N = len(time)
         S = fft.fft(signal)
         freq = fft.fftfreq(N, d=1/sample_rate)
-    
+        avg = sum(signal)/len(signal)
+        
         # sum total activity per waveband
     
         for n in range(N):   
@@ -42,6 +43,6 @@ def doFFT(input, description):
             elif (freq[n] >= 4) and (freq[n] <= 7):    # theta
                 theta += abs(S[n])/(3*N)
 
-    return {'alpha':alpha, 'beta':beta, 'delta':delta, 'theta':theta}
+    return {'avg':avg, 'alpha':alpha, 'beta':beta, 'delta':delta, 'theta':theta}
 
 
