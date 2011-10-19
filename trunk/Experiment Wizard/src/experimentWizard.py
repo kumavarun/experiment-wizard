@@ -20,9 +20,8 @@ class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.17' ### 08/06/2011 ###
-            print 'Starting Experiment Wizard %s' % self.version
-            
+            self.version = '1.18' ### October 19, 2011
+            print 'Starting Experiment Wizard %s' % self.version          
             self.parent = parent
             self.app = app
             self.statusbar = self.statusBar()
@@ -540,39 +539,39 @@ class ExperimentWizard(QMainWindow):
                 pass # fail silently        
             if haveTracker: eyetracker = True
             
-            # TODO: return dictionary
-            keys = [edk, consumer_version, testbench, eyetracker]
+            keys = {'edk':edk, 'consumer': consumer_version, 'testbench': testbench, 'eyetracker': eyetracker}
             #print keys
             return keys 
             
         def controlPanel(self):
             keys = self.getKeys()
-            if keys[0] == '':   # no EDK found, try Consumer Version
+            if keys['edk'] == '':   # no EDK found, try Consumer Version
                 if keys[1] == '':
                     self.statusbar.showMessage("Emotiv Control Panel not found", 3000)
                     return
-                keys = keys[1]
-                keys = os.path.realpath(keys[0])+'\EmotivControlPanel.exe'
+                cp = os.path.realpath(keys['consumer'][0])+'\EmotivControlPanel.exe'
             
-            else:               # EDK
-                keys = keys[0]
-                keys = os.path.realpath(keys[0])+'\EmotivControlPanel.exe'
+            else:                   # EDK
+                cp = keys['edk'][0]
+                cp = os.path.realpath(cp)+'\EmotivControlPanel.exe'
             self.statusbar.showMessage("Starting Emotiv Control Panel...", 3000)
-            subprocess.Popen(keys)
+            subprocess.Popen(cp)
         
         def testBench(self):
             keys = self.getKeys()
-            if keys[2] == '':
-                if os.path.exists(keys[0][0]+'\Testbench.exe'):
-                    loc = keys[0][0]
-                elif keys[0] == '':
-                    self.statusbar.showMessage("Emotiv Testbench not found", 3000)    
+            loc = ''
+            if keys['testbench'][0] == '':
+                    print "Emotiv Testbench not found"    
                     return
             else:
-                loc = keys[2][0]
-            keys = loc + '\TestBench.exe'
-            self.statusbar.showMessage("Starting Emotiv Testbench...", 3000)
-            subprocess.Popen(keys)
+                if os.path.exists(keys['testbench'][0]+'\Testbench.exe'):
+                    loc = keys['testbench'][0]
+            if loc != '':
+                testbench = loc + '\TestBench.exe'
+                self.statusbar.showMessage("Starting Emotiv Testbench...", 3000)
+                subprocess.Popen(testbench)
+            else:
+                print 'Could not find Testbench path'
             
         def tutorial(self):
             os.startfile('http://www.beta-lab.nl/content/tutorial')
@@ -706,10 +705,17 @@ class Settings:
         self.countdownFrom = 3  
         self.enableEyeTracker = False            
         self.haveCalibrated = False    
-        self.haveEyeTracker = parent.getKeys()[3]
+        self.haveEyeTracker = parent.getKeys()['eyetracker']
         
     def reset(self, parent):
+        # prevent some values from being reset
+        ThaveCalibrated = self.haveCalibrated
+        TenableEyetracker = self.enableEyeTracker
+        
         self.__init__(parent)
+        
+        self.haveCalibrated = ThaveCalibrated
+        self.enableEyeTracker = TenableEyetracker
         
     # take values from UI to settings
     def update(self, parent):
