@@ -89,3 +89,7 @@ class tracker:
     
     def getData(self):
         return ''.join(self.trackdata)
+    
+    def clean(self):
+        self.data = ''
+        self.trackdata = []

@@ -49,8 +49,9 @@ class slideshow(QtGui.QFrame, slideshowUi):
         self.setFocus()
         self.app = app
         self.playingAV = False        
-        self.trackerData = '' 
+        self.trackerData = ''         
         if self.settings.enableEyeTracker:
+            self.settings.eyetracker.clean()
             self.settings.eyetracker.record()
             print 'Eye tracker recording!'
 
@@ -95,6 +96,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
         
         self.images = settings.stimuli
         self.numimages = len(self.images)
+        self.imageSize = range(self.numimages+1)
         self.millis_per_img  = settings.millisPerImg
         self.millisInterval = settings.millisMaskDuration
         self.transparant = QtGui.QMovie('transparant.gif',QtCore.QByteArray(), self)
@@ -151,7 +153,10 @@ class slideshow(QtGui.QFrame, slideshowUi):
                 0x0700: 'Gyro not calibrated',
                 0x0800: 'Optimization is on'
             }
-            print('Failed to connect to EmoEngine: '+ errors[connected] ) 
+            if connected in errors:
+                print('Failed to connect to EmoEngine: '+ errors[connected] )
+            else:
+                print('Failed to connect to EmoEngine: Undocumented error code!') 
             self.online = False
 
         # Intro/countdown
@@ -282,11 +287,11 @@ class slideshow(QtGui.QFrame, slideshowUi):
                 )
                 if errorCode1 == 0x600:
                     if self.atImage == 1:
-                        print 'Device appears to be off-line'
+                        print 'EEG device appears to be off-line'
                         print 'No brain data will be recorded!'
                     self.online = False
                 else:
-                    self.online = True
+                    self.online *= True
             except:
                 print 'An error occurred while communicating with the device'
                 self.online = False
@@ -308,8 +313,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
         # save data from relevant sensors to file
         
         #  at least 20 samples OR device offline (test run)
-        if (self.iSamples > 20) or (not self.userAdded):             
-
+        if (self.iSamples > 20) or (not self.online):             
             # channels 3-16 exported
             # other channels are sensor quality, gyro etc; useless
             channels = range(3, 17)
@@ -329,24 +333,31 @@ class slideshow(QtGui.QFrame, slideshowUi):
                 stimdata['attributes'] = self.images[self.atImage-1].attributes
                 stimdata['response'] = self.response
                 stimdata['responsetime'] = self.responsetime
-                stimdata['name'] = self.images[self.atImage-1].name      
+                stimdata['name'] = self.images[self.atImage-1].name   
+                
                 
                 # store results in alldata list          
                 if not self.playingAV:
-                    if self.nextPhase == "interval":
-                        if self.settings.keysDuringMasks:
+                    if self.nextPhase == "mask": # just shown stimulus
+                        self.alldata.append(stimdata)                    
+                    elif self.nextPhase == "interval":
+                        if  self.settings.masking == 'None': # just shown stimulus, no masks
+                            self.alldata.append(stimdata)
+                        elif self.settings.keysDuringMasks:
                             # save key presses during mask in stimulus entry                         
                             self.alldata[-1]['response'] = self.response
-                            self.alldata[-1]['responsetime'] = self.responsetime                        
-                    elif self.nextPhase == "mask": # just shown stimulus                       
-                        self.alldata.append(stimdata)
-                        
-                else:   # append last audio/video segment !                    
+                            self.alldata[-1]['responsetime'] = self.responsetime    
+                        else:
+                            pass
+                else:   # append last audio/video segment !   
                     stimdata['name'] += ' segment '+str(self.movieSegment)+' (incomplete)'
                     self.alldata.append(stimdata)
+                
+                #print 'Response:', self.response       
+                #print self.alldata, stimdata
 
         # while there are images left
-        if self.atImage < len(self.images):
+        if self.atImage < self.numimages:
 
             stimname = self.images[self.atImage].name
             self.atImage += 1
@@ -399,13 +410,16 @@ class slideshow(QtGui.QFrame, slideshowUi):
                     action = False
                 elif self.nextPhase =='stimulus' and action:
                     print 'Presenting %s' % os.path.basename(stimname)
-                    stimulus = QtGui.QMovie(stimname,QtCore.QByteArray(), self) 
+                    stimulus = QtGui.QMovie(stimname,QtCore.QByteArray(), self)                     
                     self.disp.setMovie(stimulus)
                     stimulus.start()
-                    if self.settings.masking != 'None': self.nextPhase = "mask"
-                    else: self.nextPhase = "interval"
+                    if self.settings.masking != 'None': 
+                        self.nextPhase = "mask"
+                    else: 
+                        self.nextPhase = "interval"
                     if self.settings.enableEyeTracker:
-                        self.settings.eyetracker.startStim(os.path.basename(stimname))                        
+                        self.settings.eyetracker.startStim(os.path.basename(stimname))
+                        self.imageSize[self.atImage] = stimulus.currentImage().size() # log image size                         
 
             self.response = 'None'
             self.responsetime = 0
@@ -425,6 +439,12 @@ class slideshow(QtGui.QFrame, slideshowUi):
             self.alldata[-1]['response'] = self.response
             self.alldata[-1]['responsetime'] = self.responsetime   
             self.nextPhase = 'done!'
+            
+        elif (self.atImage == len(self.images)) and self.nextPhase == 'interval':
+            self.timer.start(self.millisInterval)                    
+            self.disp.setMovie(self.transparant)
+            self.transparant.start()
+            self.atImage += 1
 
         else:
             print '\nAll images shown!'
@@ -542,20 +562,25 @@ class slideshow(QtGui.QFrame, slideshowUi):
             txtcoords = re.findall(\
                 r'FPOGX="([\d\.-]*).*FPOGY="([\d\.-]*).*FPOGV="1" GPI1="([^"]*)',\
                 self.trackerData)
-            print self.trackerData
-            print txtcoords
-            for x,y,name in txtcoords:
-                fixed = [os.path.basename(name), str(int(float(x)*width)),\
-                          str(int(float(y)*height))]
+            prevname = txtcoords[0][2];
+            im = 1;            
+            for i in range(len(txtcoords)):
+                [x,y,name] = txtcoords[i]
+                if name != prevname: 
+                    im += 1
+                    prevname = name
+                #print i, name, im   
+                fixed = [os.path.basename(name), float(x)*width, float(y)*height]     
+                fixed[1] = str(int( fixed[1] + 0.5 * (self.imageSize[im].width() - width)    ))
+                fixed[2] = str(int( fixed[2] + 0.5 * (self.imageSize[im].height() - height)  ))
                 eyetrackfile.write('\t'.join(fixed)+'\n')
                 
             eyetrackfile.close()            
             
-        else:
+        if not (self.online or self.recordKeys or self.settings.enableEyeTracker):
             print 'No brain activity or user data recorded, no output file created'
         self.quitApp()
-    
-        
+            
     # called every few seconds when a movie is playing             
     def processMovieSegment(self):        
         print 'Movie segment', self.movieSegment
