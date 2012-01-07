@@ -1,11 +1,11 @@
 
         #########################################
         #                                       #
-        #        BETA LAB EXPERIMENTER          #
+        #           EXPERIMENT WIZARD           #
         #               Main file               #
         #            by Jeroen Kools            #
         #        jkools@science.uva.nl          #
-        #              2010-2011                #
+        #              2010-2012                #
         #                                       #
         #########################################
 
