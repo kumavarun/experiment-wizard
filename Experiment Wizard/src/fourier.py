@@ -8,11 +8,10 @@
 from numpy import fft, arange, r_
 
 def doFFT(input, description):
-    source = input
 
     i = 0
-    signal = arange(len(source))
-    for line in source:
+    signal = arange(len(input))
+    for line in input:
         signal[i] = float(line)
         i += 1
 

@@ -13,6 +13,7 @@ class tracker:
         self.data = ''
         self.sock = self.connect()
         self.trackdata = []
+        raise
                 
     def connect(self):
         sock = socket(AF_INET, SOCK_STREAM)
@@ -22,6 +23,7 @@ class tracker:
             sock.settimeout(5.0)
         except Exception as e:
             print ' Eyetracker software found, but device seems to be offline!'
+            return -1
         return sock
     
     def calibrate(self):
@@ -46,7 +48,7 @@ class tracker:
     #FPOGX float Fixation point-of-gaze X
     #FPOGY float Fixation point-of-gaze Y
     #FPOGS float Fixation start (seconds)
-    #FPOGD float Fixation duration (elapsed time since xation start (seconds))
+    #FPOGD float Fixation duration (elapsed time since fixation start (seconds))
     #FPOGID int Fixation number ID
     #FPOGV int Fixation point-of-gaze valid ag
     
