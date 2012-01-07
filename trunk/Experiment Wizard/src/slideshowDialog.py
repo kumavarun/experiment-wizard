@@ -11,7 +11,7 @@
         #  Python 2.6, PyQt4, ctypes, Emotiv SDK, Emotiv hardware   #
         #                                                           #
         #                   by Jeroen Kools                         #
-        #                       2010-2011                         	#
+        #                       2010-2011                           #
         #                                                           #
         #############################################################
 
@@ -48,7 +48,8 @@ class slideshow(QtGui.QFrame, slideshowUi):
         self.ui.setupUi(self)
         self.setFocus()
         self.app = app
-        self.playingAV = False        
+        self.playingAV = False     
+        self.userAdded = False   
         self.trackerData = ''         
         if self.settings.enableEyeTracker:
             self.settings.eyetracker.clean()
@@ -109,8 +110,10 @@ class slideshow(QtGui.QFrame, slideshowUi):
             self.outputdir = settings.outputFolder + '/'
         if not os.path.exists(self.outputdir):
             os.mkdir(self.outputdir)
-        self.csvname = self.outputdir+self.subject.name+self.date+'.csv'
-        self.arffname = self.outputdir+self.subject.name+self.date+'.arff'
+        outname = '%s%s %s%s' % (self.outputdir, settings.outputPrefix, self.subject.name, self.date)
+        self.csvname = outname + '.csv' 
+        self.arffname = outname+'.arff'
+        self.rawname = outname+'.raw'
         
         self.alldata = []
         self.response = 'None'
@@ -127,12 +130,18 @@ class slideshow(QtGui.QFrame, slideshowUi):
             shuffle(self.images)
 
         # Create link to Emotiv engine
-        connected = edk.EE_EngineConnect()
+        connected = -1
+        try:
+            connected = edk.EE_EngineConnect("Emotiv Systems-5")
+        except:
+            pass
         if connected == 0x0000:
             print 'Connected to EmoEngine!'
         else:
             errors = {
+                -1    : 'Emotiv DLL missing',   
                 0x0001: 'Unknown error',
+                0x0002: 'SDK version problem',
                 0x0101: 'Invalid profile',
                 0x0102: 'No user profile',
                 0x0200: 'No signal',
@@ -211,42 +220,42 @@ class slideshow(QtGui.QFrame, slideshowUi):
         if self.iCountdown <= 0:
 
             # Setup EDK interface
-            self.eventHandle = edk.EE_EmoEngineEventCreate()
-            self.state = edk.EE_EmoStateCreate()
-            userID = c_uint(999)
+            if self.online:
+                self.eventHandle = edk.EE_EmoEngineEventCreate()
+                self.state = edk.EE_EmoStateCreate()
+                userID = c_uint(999)
+    
+                self.data  = edk.EE_DataCreate()
+                bufferset = edk.EE_DataSetBufferSizeInSec(int(self.millis_per_img/1000.))
 
-            self.data  = edk.EE_DataCreate()
-            bufferset = edk.EE_DataSetBufferSizeInSec(int(self.millis_per_img/1000.))
+                if bufferset != 0:
+                    print 'Failed to initialize buffer!'
 
-            if bufferset != 0:
-                print 'Failed to initialize buffer!'
-
-            # Add user
-            self.userAdded = False
-            attempts = 0
-            maxAttempts = 50000
-            while(not(self.userAdded) and (attempts < maxAttempts)):
-                attempts += 1
-                eventstate = edk.EE_EngineGetNextEvent(self.eventHandle)
-                if eventstate == 0x0000:
-                    eventType = edk.EE_EmoEngineEventGetType(self.eventHandle)
-                    edk.EE_EmoEngineEventGetUserId(self.eventHandle, byref(userID))
-                    if eventType == 0x0010: # UserAdded
-                        print 'User added at attempt '+str(attempts)
-                        self.userAdded = True
-                        print 'Connected to EPOC wifi receiver!'
-                        print 'User: '+str(userID.value)
-                        edk.EE_DataAcquisitionEnable(userID,True)
-                        version = c_char_p("version number")
-                        vchars = c_uint(25)
-                        build = c_ulong()
-                        edk.EE_SoftwareGetVersion(version,vchars,
-                                                  byref(build))
-                        print 'SDK version: '+version.value
-
-            if (attempts >= maxAttempts-1 and not(self.userAdded)):
-                print 'Time-out error: Failed to connect to headset..'
-                self.online = False
+                # Add user
+                attempts = 0
+                maxAttempts = 50000
+                while(not(self.userAdded) and (attempts < maxAttempts)):
+                    attempts += 1
+                    eventstate = edk.EE_EngineGetNextEvent(self.eventHandle)
+                    if eventstate == 0x0000:
+                        eventType = edk.EE_EmoEngineEventGetType(self.eventHandle)
+                        edk.EE_EmoEngineEventGetUserId(self.eventHandle, byref(userID))
+                        if eventType == 0x0010: # UserAdded
+                            print 'User added at attempt '+str(attempts)
+                            self.userAdded = True
+                            print 'Connected to EPOC wifi receiver!'
+                            print 'User: '+str(userID.value)
+                            edk.EE_DataAcquisitionEnable(userID,True)
+                            version = c_char_p("version number")
+                            vchars = c_uint(25)
+                            build = c_ulong()
+                            edk.EE_SoftwareGetVersion(version,vchars,
+                                                      byref(build))
+                            print 'SDK version: '+version.value
+    
+                if (attempts >= maxAttempts-1 and not(self.userAdded)):
+                    print 'Time-out error: Failed to connect to headset..'
+                    self.online = False
 
             self.atImage = 0
             self.countdownTimer.stop()
@@ -266,6 +275,8 @@ class slideshow(QtGui.QFrame, slideshowUi):
         self.disp.setText("")
         self.disp.clear() # clear previous image
         self.vp.hide()
+        
+        #print self.atImage, self.nextPhase
             
         
         # collect data from device buffer
@@ -287,20 +298,20 @@ class slideshow(QtGui.QFrame, slideshowUi):
                 )
                 if errorCode1 == 0x600:
                     if self.atImage == 1:
-                        print 'EEG device appears to be off-line'
+                        print 'EPOC appears to be off-line'
                         print 'No brain data will be recorded!'
                     self.online = False
                 else:
                     self.online *= True
             except:
-                print 'An error occurred while communicating with the device'
+                print 'An error occurred while communicating with EPOC device'
                 self.online = False
                 #self.quitApp()
-            if (self.atImage > 0):
+            if (self.atImage > 0) and self.online:
                 print '  status: ', errorCode, errorCode1, errorCode2
 
         samplesTaken = c_uint(0)
-        if (self.movieSamples == 0):
+        if (self.movieSamples == 0) and self.online:
             edk.EE_DataGetNumberOfSample(self.data,byref(samplesTaken))
             
         self.iSamples = samplesTaken.value + self.movieSamples
@@ -323,12 +334,13 @@ class slideshow(QtGui.QFrame, slideshowUi):
 
             if (1 <= self.atImage <= len(self.images) and self.movieSamples == 0):
                 
-                for i in range(len(channels)):
-                    channelData = channelDataType()
-                    _check = edk.EE_DataGet(self.data,channels[i],
-                                           channelData,samplesTaken)
-                    channelname = self.channelnames[i]
-                    stimdata['channels'][channelname] = channelData
+                if self.online:
+                    for i in range(len(channels)):
+                        channelData = channelDataType()
+                        _check = edk.EE_DataGet(self.data,channels[i],
+                                               channelData,samplesTaken)
+                        channelname = self.channelnames[i]
+                        stimdata['channels'][channelname] = channelData
 
                 stimdata['attributes'] = self.images[self.atImage-1].attributes
                 stimdata['response'] = self.response
@@ -350,11 +362,11 @@ class slideshow(QtGui.QFrame, slideshowUi):
                         else:
                             pass
                 else:   # append last audio/video segment !   
-                    stimdata['name'] += ' segment '+str(self.movieSegment)+' (incomplete)'
+                    if self.movieSegment > 1:
+                        stimdata['name'] += ' segment '+str(self.movieSegment+1)
+                    if self.nextPhase == "stimulus":
+                        stimdata['name'] += ' (interval)'
                     self.alldata.append(stimdata)
-                
-                #print 'Response:', self.response       
-                #print self.alldata, stimdata
 
         # while there are images left
         if self.atImage < self.numimages:
@@ -373,14 +385,25 @@ class slideshow(QtGui.QFrame, slideshowUi):
             
             # VIDEO and AUDIO            
             if str(extension) in slideshow.mediatypes:
-                print 'Presenting %s' % os.path.basename(stimname)
-                self.playingAV = True
-                media = Phonon.MediaSource(stimname)                 
-                self.vp.load(media)
-                self.timer.stop()       
-                self.movieSegmentTimer.start(self.millis_per_img)
-                self.vp.show()
-                self.vp.play()
+                action = True
+                if self.nextPhase == "stimulus":
+                    self.nextPhase = "interval"
+                    print 'Presenting %s' % os.path.basename(stimname)
+                    self.playingAV = True
+                    media = Phonon.MediaSource(stimname)                 
+                    self.vp.load(media)
+                    self.timer.stop()       
+                    self.movieSegmentTimer.start(self.millis_per_img)
+                    self.vp.show()
+                    self.vp.play()
+                    action = False
+                if self.nextPhase == "interval" and action:
+                    self.nextPhase = "stimulus"
+                    if self.millisInterval > 0:
+                        self.timer.start(self.millisInterval)                    
+                        self.disp.setMovie(self.transparant)
+                        self.transparant.start()  
+                        self.atImage -= 1   
                 
             # IMAGE
             else:   
@@ -410,7 +433,13 @@ class slideshow(QtGui.QFrame, slideshowUi):
                     action = False
                 elif self.nextPhase =='stimulus' and action:
                     print 'Presenting %s' % os.path.basename(stimname)
-                    stimulus = QtGui.QMovie(stimname,QtCore.QByteArray(), self)                     
+                    stimulus = QtGui.QMovie(stimname,QtCore.QByteArray(), self)    
+                    #stimulus = QtGui.QPixmap(stimname)  
+                    #if stimulus.height() > self.resolution.height():  
+                    #    stimulus = stimulus.scaledToHeight(self.resolution.height())
+                    #elif stimulus.width() > self.resolution.width():
+                    #    stimulus = stimulus.scaledToWidth(self.resolution.width())
+                    #self.disp.setPixmap(stimulus)
                     self.disp.setMovie(stimulus)
                     stimulus.start()
                     if self.settings.masking != 'None': 
@@ -440,6 +469,12 @@ class slideshow(QtGui.QFrame, slideshowUi):
             self.alldata[-1]['responsetime'] = self.responsetime   
             self.nextPhase = 'done!'
             
+        elif self.playingAV and self.nextPhase == 'interval':
+            self.timer.start(self.millisInterval)                    
+            self.disp.setMovie(self.transparant)
+            self.transparant.start()  
+            self.nextPhase = 'done!'  
+            
         elif (self.atImage == len(self.images)) and self.nextPhase == 'interval':
             self.timer.start(self.millisInterval)                    
             self.disp.setMovie(self.transparant)
@@ -447,7 +482,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
             self.atImage += 1
 
         else:
-            print '\nAll images shown!'
+            print '\nAll stimuli presented!'
             self.disp.setText('')
             if self.settings.enableEyeTracker:
                 self.settings.eyetracker.stopStim()
@@ -462,11 +497,13 @@ class slideshow(QtGui.QFrame, slideshowUi):
             ##############################################
         
         print 'Saving data...'
-        wavebands = ['average', 'alpha', 'beta', 'delta', 'theta']
+        wavebands = ['avg', 'alpha', 'beta', 'delta', 'theta']
 
         if self.online or self.recordKeys:
             self.csv = open(self.csvname,'w')
             self.arff = open(self.arffname,'w')
+            seps = {'Semicolon':';', 'Comma':',', 'Tab':'\t'}
+            sep = seps[str(self.settings.CSVseparator)]
             print 'Processing data for %s stimuli' % str(len(self.alldata))            
             if self.online:
                 print 'Performing Fast Fourier Transform...'
@@ -475,14 +512,14 @@ class slideshow(QtGui.QFrame, slideshowUi):
             headers = 'Index;Stimulus'
             for a in self.images[0].attributes:
                 (attr,_val) = a
-                headers = ';'.join([headers,str(attr)])
+                headers = sep.join([headers,str(attr)])
             if self.recordKeys:
-                headers = ';'.join([headers,'Response','Resp time'])
+                headers = sep.join([headers,'Response','Resp time'])
             if self.online:
                 for channel in self.channelnames:
                     for waveband in wavebands:
                         name = '%s %s' % (channel,waveband)
-                        headers = ';'.join([headers,name])            
+                        headers = sep.join([headers,name])            
             self.csv.write(headers+'\n')
             
             ## ARFF; write column headers
@@ -523,27 +560,27 @@ class slideshow(QtGui.QFrame, slideshowUi):
             for i in range(len(self.alldata)):
                 stimulus = self.alldata[i]
                 name = os.path.basename(stimulus['name'])
-                csv = ';'.join([str(i+1),name])
+                csv = sep.join([str(i+1),name])
                 arff = ''
                 
                 for a in stimulus['attributes']:
                     (attr,val) = a
-                    csv = ';'.join([csv,str(val)])
+                    csv = sep.join([csv,str(val)])
                     if arff == '':
                         arff = str(val)
                     else:
                         arff = ','.join([arff,str(val)])
                 if self.recordKeys:
                     r = str(stimulus['response'])
-                    rs = str(stimulus['responsetime'])
-                    csv = ';'.join([csv,r,rs])
+                    rs = str('%.3f' % stimulus['responsetime'])
+                    csv = sep.join([csv,r,rs])
                     arff = ','.join([arff,r,rs])
                 if self.online:
                     for channel in stimulus['channels']:
                         channeldata = stimulus['channels'][channel]
-                        bandscores = doFFT(channeldata, channel) # TODO: avg
-                        for waveband in bandscores:
-                            csv = ';'.join([csv,str(bandscores[waveband])])
+                        bandscores = doFFT(channeldata, channel) 
+                        for waveband in wavebands:
+                            csv = sep.join([csv,str(bandscores[waveband])])
                             arff = ','.join([arff,str(bandscores[waveband])])
                 self.csv.write(csv+'\n')
                 self.arff.write(arff+'\n')
@@ -552,28 +589,54 @@ class slideshow(QtGui.QFrame, slideshowUi):
             self.csv.close()
             self.arff.close()
             
+        if self.online and self.settings.saveRawEEG:
+            print 'Writing raw EEG data..'
+            self.raw = open(self.rawname, 'w')
+            
+            # write column headers
+            self.raw.write('Index;Stimulus;'+';'.join(self.channelnames)+'\n')
+            
+            # write lines
+            n = 0
+            for i in range(len(self.alldata)):  # for every stimulus
+                stimulus = self.alldata[i]
+                name = os.path.basename(stimulus['name'])
+                for j in range(len(stimulus['channels'][self.channelnames[1]])):
+                    n += 1
+                    indexstimname = ';'.join([str(n+1),name])+';'
+                    channeldata = [] 
+                    for channel in stimulus['channels']:
+                        channeldata = channeldata + [str(stimulus['channels'][channel][j])]
+                    channeldata = ';'.join(channeldata)
+                    self.raw.write(indexstimname+channeldata+'\n')
+            
+            print 'Done!'
+                        
+            
         if self.settings.enableEyeTracker:
             eyetrackname = self.outputdir+self.subject.name+self.date+'.eye'
             eyetrackfile = open(eyetrackname,'w')
             from win32api import GetSystemMetrics
             import re
-            width = GetSystemMetrics (0)
+            width = GetSystemMetrics (0) # TODO: use self.ui.resolution
             height = GetSystemMetrics (1)
             txtcoords = re.findall(\
                 r'FPOGX="([\d\.-]*).*FPOGY="([\d\.-]*).*FPOGV="1" GPI1="([^"]*)',\
                 self.trackerData)
-            prevname = txtcoords[0][2];
-            im = 1;            
-            for i in range(len(txtcoords)):
-                [x,y,name] = txtcoords[i]
-                if name != prevname: 
-                    im += 1
-                    prevname = name
-                #print i, name, im   
-                fixed = [os.path.basename(name), float(x)*width, float(y)*height]     
-                fixed[1] = str(int( fixed[1] + 0.5 * (self.imageSize[im].width() - width)    ))
-                fixed[2] = str(int( fixed[2] + 0.5 * (self.imageSize[im].height() - height)  ))
-                eyetrackfile.write('\t'.join(fixed)+'\n')
+            if len(txtcoords)>0:
+                prevname = txtcoords[0][2];
+                im = 1      
+                for i in range(len(txtcoords)):
+                    [x,y,name] = txtcoords[i]
+                    if name != prevname: 
+                        im += 1
+                        prevname = name
+                        
+                    #print i, name, im   
+                    fixed = [os.path.basename(name), float(x)*width, float(y)*height]     
+                    fixed[1] = str(int( fixed[1] + 0.5 * (self.imageSize[im].width() - width)    ))
+                    fixed[2] = str(int( fixed[2] + 0.5 * (self.imageSize[im].height() - height)  ))
+                    eyetrackfile.write('\t'.join(fixed)+'\n')
                 
             eyetrackfile.close()            
             
@@ -582,7 +645,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
         self.quitApp()
             
     # called every few seconds when a movie is playing             
-    def processMovieSegment(self):        
+    def processMovieSegment(self):        # TODO: record eyetracker stuff
         print 'Movie segment', self.movieSegment
         
         # C calls to store EEG data for previous segment
@@ -599,7 +662,8 @@ class slideshow(QtGui.QFrame, slideshowUi):
             #self.quitApp()        
         
         samplesTaken = c_uint(0)
-        edk.EE_DataGetNumberOfSample(self.data,byref(samplesTaken))
+        if self.online:
+            edk.EE_DataGetNumberOfSample(self.data,byref(samplesTaken))
         samples = samplesTaken.value
         self.movieSamples += samples # total number of samples for this movie
         print '  samples collected for movie segment '+str(self.movieSegment)+\
@@ -631,6 +695,9 @@ class slideshow(QtGui.QFrame, slideshowUi):
             stimdata['name'] = self.images[self.atImage-1].name + " segment " + str(self.movieSegment)
             self.alldata.append(stimdata)
             self.movieSegmentTimer.start(self.millis_per_img)    
+            if self.settings.enableEyeTracker:
+                stimname = self.images[self.atImage].name
+                self.settings.eyetracker.startStim(os.path.basename("%s %s" % (stimname, self.movieSegment)))
 
             # reset necessary values
             self.movieSegment += 1

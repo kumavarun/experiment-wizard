@@ -20,7 +20,7 @@ class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.18' ### October 19, 2011
+            self.version = '1.21b' ### January 7, 2012
             print 'Starting Experiment Wizard %s' % self.version          
             self.parent = parent
             self.app = app
@@ -88,7 +88,6 @@ class ExperimentWizard(QMainWindow):
                     self.settings.eyetracker = eyetracker.tracker()
                 except:                      # eye tracker installed but not connected
                     self.settings.haveEyeTracker = False
-            
             print 'Started successfully!'
             
         def reset(self):
@@ -216,8 +215,7 @@ class ExperimentWizard(QMainWindow):
                         index = min(len(self.settings.stimuli)-2,self.ui.stimulusList.row(selectionItem))
                         self.deletedStim = index                  
                         for stimulus in self.settings.stimuli:
-                            pieces = stimulus.name.split('/')
-                            displayname = pieces[len(pieces)-1]                                
+                            displayname = os.path.basename(stimulus.name)                               
                             if displayname == selection:
                                 self.settings.stimuli.remove(stimulus)
                         self.statusbar.showMessage("Stimulus deleted", 2000)
@@ -302,6 +300,7 @@ class ExperimentWizard(QMainWindow):
             
             out.write('generateARFF=%s\n' % str(self.settings.generateARFF))
             out.write('generateCSV=%s\n' % str(self.settings.generateCSV))
+            out.write('saveRaw=%s\n' % str(self.settings.saveRawEEG))
             out.write('CSVseparator=%s\n' % str(self.settings.CSVseparator))
             out.write('outputPrefix=%s\n' % str(self.settings.outputPrefix))
             out.write('outputFolder=%s\n' % str(self.settings.outputFolder) )           
@@ -383,14 +382,16 @@ class ExperimentWizard(QMainWindow):
                 if var == 'backgroundColor':
                     self.ui.backgroundColorComboBox.setCurrentIndex(int(val))
                 if var == 'stimulusDuration':
-                    self.ui.durationSpinbox.setValue(round(float(val),1))
+                    self.ui.durationSpinbox.setValue(float(val))
                 if var == 'interStimulusInterval':
-                    self.ui.intervalSpinbox.setValue(round(float(val),1))
+                    self.ui.intervalSpinbox.setValue(float(val))
                     
                 if var == 'generateARFF':
                     self.settings.generateARFF = (val == 'True')
                 if var == 'generateCSV':
                     self.settings.generateCSV = (val == 'True')
+                if var == 'saveRaw':
+                    self.settings.saveRawEEG = (val == 'True')
                 if var == 'CSVseparator':
                     self.settings.CSVseparator = val
                 if var == 'outputPrefix':
@@ -508,13 +509,14 @@ class ExperimentWizard(QMainWindow):
         
         def getKeys(self):
             # init return vals with empty strings
-            edk = consumer_version = testbench = haveTracker = ''
+            edk = consumer_version = testbench = haveTracker = version = ''
             eyetracker = False
             
             try: 
                 edk_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, \
                                       "SOFTWARE\Emotivsystems\currentversion")
                 edk = _winreg.QueryValueEx(edk_key, "InstallPath")
+                version = _winreg.QueryValueEx(edk_key, "version")[0]
             except:
                 pass # fail silently
             
@@ -530,7 +532,7 @@ class ExperimentWizard(QMainWindow):
                                       "SOFTWARE\Emotiv Testbench\currentversion")
                 testbench = _winreg.QueryValueEx(testbench_key, "InstallPath")
             except:
-                pass # fail silently
+                testbench = edk # use EDK path, since there is no separate reg entry in 1.0.0.4
             
             try:
                 haveTracker = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, \
@@ -539,14 +541,17 @@ class ExperimentWizard(QMainWindow):
                 pass # fail silently        
             if haveTracker: eyetracker = True
             
-            keys = {'edk':edk, 'consumer': consumer_version, 'testbench': testbench, 'eyetracker': eyetracker}
-            #print keys
+            keys = {'edk':edk,
+                    'edkVersion': version,
+                    'consumer': consumer_version, 
+                    'testbench': testbench, 
+                    'eyetracker': eyetracker}
             return keys 
             
         def controlPanel(self):
             keys = self.getKeys()
             if keys['edk'] == '':   # no EDK found, try Consumer Version
-                if keys[1] == '':
+                if keys['consumer'] == '':
                     self.statusbar.showMessage("Emotiv Control Panel not found", 3000)
                     return
                 cp = os.path.realpath(keys['consumer'][0])+'\EmotivControlPanel.exe'
@@ -560,7 +565,8 @@ class ExperimentWizard(QMainWindow):
         def testBench(self):
             keys = self.getKeys()
             loc = ''
-            if keys['testbench'][0] == '':
+            
+            if keys['testbench'] == '':
                     print "Emotiv Testbench not found"    
                     return
             else:
@@ -596,6 +602,7 @@ class SettingsDialog(QDialog):
         # output settings
         self.ui.generateARFFCheckBox.setChecked(self.parent.settings.generateARFF) 
         self.ui.generateCSVCheckBox.setChecked(self.parent.settings.generateCSV)
+        self.ui.saveRawEEGCheckBox.setChecked(self.parent.settings.saveRawEEG)
         self.ui.comboBox.setCurrentIndex(self.ui.comboBox.findText(\
                                 self.parent.settings.CSVseparator)) 
         self.ui.lineEdit_2.setText(self.parent.settings.outputPrefix)  
@@ -614,6 +621,7 @@ class SettingsDialog(QDialog):
         
         # misc settings
         self.ui.spinBox.setValue(self.parent.settings.countdownFrom)
+        self.ui.calibrateButton.setEnabled(self.parent.settings.haveEyeTracker)
         self.ui.eyetrackCheckBox.setChecked(self.parent.settings.enableEyeTracker)
         self.ui.eyetrackCheckBox.setEnabled(self.parent.settings.haveCalibrated)
         
@@ -623,6 +631,7 @@ class SettingsDialog(QDialog):
         # output settings
         self.parent.settings.generateARFF = self.ui.generateARFFCheckBox.isChecked()
         self.parent.settings.generateCSV = self.ui.generateCSVCheckBox.isChecked()
+        self.parent.settings.saveRawEEG = self.ui.saveRawEEGCheckBox.isChecked()
             # TODO: generate spectrograms
         self.parent.settings.CSVseparator = self.ui.comboBox.currentText()
         self.parent.settings.outputPrefix = self.ui.lineEdit_2.text().trimmed() # TODO: remove invalid chars 
@@ -682,11 +691,12 @@ class Settings:
         parent.ui.lastUntilSpaceCheckBox.setChecked(False)
         self.millisPerImg = 5000
         self.millisMaskDuration = 1000
-        self.bgColor = 'Black'
+        self.bgColor = 'Grey'
         
         # output settings
         self.generateARFF = True
         self.generateCSV = True
+        self.saveRawEEG = False
         self.CSVseparator = 'Semicolon'
         self.outputPrefix = '' 
         self.outputFolder = ''
@@ -725,7 +735,7 @@ class Settings:
              
         self.millisPerImg = 1000 * parent.ui.durationSpinbox.value()
         if self.untilSpacePressed:
-            self.millisPerImg = 60e3                       # 1 minute
+            self.millisPerImg = 600e3                       # 10 minutes
         self.millisMaskDuration = 1000 * parent.ui.intervalSpinbox.value()
         self.bgColor = str(parent.ui.backgroundColorComboBox.currentText())
     
@@ -881,16 +891,15 @@ class entityAdder(QDialog):
             #self.OK = False
             filenames = QFileDialog.getOpenFileNames(self, 'Select file',folder,types)
             f = filenames
-
             if filenames.count() >= 1:
-                self.parent.lastOpenFolder = QString(str(filenames[0]).rsplit('\\',1)[0])
+                self.parent.lastOpenFolder = QString(os.path.dirname(str(filenames[0])))
                 self.names = filenames
             if filenames.count() == 1:
-                f = filenames                
-                self.ui.lineEdit.setText(f[0])
+                f = filenames   
+                self.ui.lineEdit.setText(f[0]) # TODO: fix 
             if filenames.count() > 1:
                 f = str(len(filenames)) + ' files selected'
-                self.ui.lineEdit.setText(f)                                
+                self.ui.lineEdit.setText(f)                             
                 
         def enableOK(self,text):
             if (os.path.exists(self.names[0])) or (self.type == 'subject'):
