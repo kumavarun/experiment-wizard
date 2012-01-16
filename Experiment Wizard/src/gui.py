@@ -402,7 +402,7 @@ class slideshowUi(object):
         
         self.label = self.disp
         self.vp = VideoPlayer(self)
-        
+                
 ##--------------------------------------%%
 ##            VideoPlayer               ##
 ##        Displays video stimuli        ##
@@ -418,19 +418,21 @@ class VideoPlayer(Phonon.VideoPlayer):
         self.setFocus()
         self.parent = parent       
         QtGui.QShortcut(QtGui.QKeySequence("Space"), self,QtCore.SIGNAL("finished()"))
-        QtGui.QShortcut(QtGui.QKeySequence("Space"), self,self.space())
-        QtGui.QShortcut(QtGui.QKeySequence("Escape"), self,self.space())        
+        #QtGui.QShortcut(QtGui.QKeySequence("Space"), self,self.space())
+        #QtGui.QShortcut(QtGui.QKeySequence("Escape"), self,self.space())        
         
     # TODO: fix skipping
     def keyPressEvent(self, event):
+        #print 'videoplayer keypressevent'
         self.parent.keyPressEvent(event) # pass on to slideshowDialog
         event.accept()
     
-    def space(self):
+    def space(self): # skip movie, go to next stimulus
+        #print 'videoplayer space'
         self.stop()
-        #self.quit()
         
-    def quit(self):        
+    def quit(self):
+        #print 'videoplayer quit'        
         #print 'Finished playing AV stimulus'
         self.hide()
         
@@ -594,7 +596,7 @@ class settingsUi(object):
         self.spinBox.setProperty("value", 3)
         self.spinBox.setObjectName("spinBox")
         self.groupBox = QtGui.QGroupBox(self.tab_4)
-        self.groupBox.setGeometry(QtCore.QRect(10, 80, 121, 81))
+        self.groupBox.setGeometry(QtCore.QRect(20, 80, 100, 81))
         self.groupBox.setObjectName("groupBox")
         self.eyetrackCheckBox = QtGui.QCheckBox(self.groupBox)
         self.eyetrackCheckBox.setEnabled(False)
@@ -603,13 +605,24 @@ class settingsUi(object):
         self.calibrateButton = QtGui.QPushButton(self.groupBox)
         self.calibrateButton.setGeometry(QtCore.QRect(20, 20, 61, 21))
         self.calibrateButton.setObjectName("calibrateButton")
+        self.webcamBox = QtGui.QGroupBox(self.tab_4)
+        self.webcamBox.setGeometry(QtCore.QRect(135, 80, 120, 81))
+        self.webcamBox.setObjectName("webcamBox")
+        self.webcamCheckBox = QtGui.QCheckBox(self.webcamBox)
+        self.webcamCheckBox.setGeometry(QtCore.QRect(20, 50, 70, 17))
+        self.webcamCheckBox.setObjectName("webcamCheckBox")
+        self.webcamButton = QtGui.QPushButton(self.webcamBox)
+        self.webcamButton.setGeometry(QtCore.QRect(20, 20, 81, 21))
+        self.webcamButton.setObjectName("webcamButton")
         self.tabWidget.addTab(self.tab_4, "")
+        
 
         self.retranslateUi(Settings)
         self.tabWidget.setCurrentIndex(0)
         QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL("accepted()"), Settings.accept)
         QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL("rejected()"), Settings.reject)
         QtCore.QObject.connect(self.calibrateButton, QtCore.SIGNAL("clicked()"), Settings.calibrate)
+        QtCore.QObject.connect(self.webcamButton, QtCore.SIGNAL("clicked()"), Settings.webcam)
         QtCore.QObject.connect(self.pushButton_2, QtCore.SIGNAL("clicked()"), Settings.setMaskFolder)
         QtCore.QObject.connect(self.pushButton, QtCore.SIGNAL("clicked()"), Settings.setOutputFolder)
         QtCore.QMetaObject.connectSlotsByName(Settings)
@@ -662,8 +675,11 @@ class settingsUi(object):
         self.customizeBandsButton.setText(QtGui.QApplication.translate("Settings", "Customize", None, QtGui.QApplication.UnicodeUTF8))
         self.label_10.setText(QtGui.QApplication.translate("Settings", "Countdown starts at", None, QtGui.QApplication.UnicodeUTF8))
         self.groupBox.setTitle(QtGui.QApplication.translate("Settings", "Eye Tracking", None, QtGui.QApplication.UnicodeUTF8))
+        self.webcamBox.setTitle(QtGui.QApplication.translate("Settings", "Webcam", None, QtGui.QApplication.UnicodeUTF8))
         self.eyetrackCheckBox.setText(QtGui.QApplication.translate("Settings", "Enable", None, QtGui.QApplication.UnicodeUTF8))
         self.calibrateButton.setText(QtGui.QApplication.translate("Settings", "Calibrate", None, QtGui.QApplication.UnicodeUTF8))
+        self.webcamButton.setText(QtGui.QApplication.translate("Settings", "Select Codec", None, QtGui.QApplication.UnicodeUTF8))
+        self.webcamCheckBox.setText(QtGui.QApplication.translate("Settings", "Enable", None, QtGui.QApplication.UnicodeUTF8))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_4), QtGui.QApplication.translate("Settings", "Misc", None, QtGui.QApplication.UnicodeUTF8))
 
 class statsUi(object):

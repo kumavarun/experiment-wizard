@@ -22,7 +22,7 @@ from ctypes import byref, c_char_p, c_double, c_uint, c_ulong, cdll
 from fourier import doFFT
 from gui import slideshowUi
 from re import match
-import os, time, random
+import os, time, random, cv
 libc = cdll.msvcrt # load C library
 EDK_loaded = True
 
@@ -186,6 +186,13 @@ class slideshow(QtGui.QFrame, slideshowUi):
 
         self.countdownTimer.start(1000)
         
+        if self.settings.useWebcam:
+            self.webcamTimer = QtCore.QTimer(self)
+            self.webcamFramesWritten = 0
+            self.connect(self.webcamTimer,
+                     QtCore.SIGNAL("timeout()"),
+                     self.getWebcamFrame)
+        
         self.movieSegmentTimer = QtCore.QTimer(self)
         self.connect(self.movieSegmentTimer,
                      QtCore.SIGNAL("timeout()"),
@@ -198,8 +205,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
         
         self.connect(self.vp,
                      QtCore.SIGNAL('finished()'),
-                     self.update_image)             
-
+                     self.update_image)
 
 
 ### helper functions
@@ -260,7 +266,17 @@ class slideshow(QtGui.QFrame, slideshowUi):
             self.atImage = 0
             self.countdownTimer.stop()
             self.timer.start(self.millis_per_img+self.delay)
+            if self.settings.useWebcam:
+                self.webcamTimer.start(100)
+            self.t0 = time.time()
             self.update_image()
+            
+    def getWebcamFrame(self):       
+        self.webcamTimer.start(100)
+        image=cv.QueryFrame(self.settings.webCamCapture)
+        cv.WriteFrame(self.settings.videoWriter, image)
+        cv.WaitKey(2)
+        self.webcamFramesWritten += 1
 
     # file type checks, used by list filters
     def isRecord(self,i):
@@ -489,6 +505,12 @@ class slideshow(QtGui.QFrame, slideshowUi):
                 self.trackerData = 'Tracker data:\n'+\
                     self.settings.eyetracker.getData()
             self.writeOutput()
+            
+            if self.settings.useWebcam:
+                self.webcamTimer.stop()
+                td = time.time() - self.t0
+                del self.settings.videoWriter
+                print 'Recorded %i webcam frames in %.3f seconds, %.1f fps' % (self.webcamFramesWritten, td, self.webcamFramesWritten/td)
                         
     def writeOutput(self):
             ##############################################
@@ -710,6 +732,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
             self.haveHadKeypresses = True            
             responsetime = time.clock() - self.displaytime
             resp = str(event.text()).upper()
+            #print 'keypress ', resp, str(event.key()).upper()
             if resp == ' ':
                 if self.response == 'None':
                     self.response = 'Space'
@@ -719,6 +742,9 @@ class slideshow(QtGui.QFrame, slideshowUi):
                 self.response = 'None'
                 self.responsetime = 0                
             else:
+                if event.key() == 16777216: # escape
+                    self.vp.quit() 
+                    self.quitApp()
                 self.response = resp
                 self.responsetime = responsetime
             event.accept()            
@@ -729,6 +755,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
     # called with Escape or by errors
     def quitApp(self):
         self.timer.stop()
+        self.webcamTimer.stop()
         self.countdownTimer.stop()
         self.movieSegmentTimer.stop()
         self.vp.stop()
