@@ -14,13 +14,14 @@ from PyQt4.QtGui import QApplication, QDialog, QComboBox, QDialogButtonBox, \
      QFileDialog, QWidget, QTextEdit, QShortcut, QKeySequence, QMainWindow
 from slideshowDialog import slideshow
 import sys, os, getpass, re, gui, _winreg, subprocess, pickle, datetime, eyetracker
+import cv, time
 
                 
 class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.21b' ### January 7, 2012
+            self.version = '1.22' ### January 15, 2012
             print 'Starting Experiment Wizard %s' % self.version          
             self.parent = parent
             self.app = app
@@ -267,8 +268,13 @@ class ExperimentWizard(QMainWindow):
                 print 'Can\'t move selection up!\n' +str(e)
 
         def exit(self):
-            if self.settings.hasRunExperiment:
-                del self.slide.vp # prevents crash on exit?
+            try:    del self.slide.vp # prevents crash on exit?
+            except: pass
+            if self.settings.useWebcam:
+                try:
+                    del self.settings.videoWriter
+                    del self.settings.webCamCapture
+                except: pass                
             self.stats.save()
             QApplication.closeAllWindows();
             QApplication.exit()
@@ -482,9 +488,10 @@ class ExperimentWizard(QMainWindow):
             self.settings.hasRunExperiment = True
             self.settings.update(self) 
 
+
             # Try to use selected subject; if that doesn't work
-            # and there's only one subject, use that one
-            # else, anonymous
+            # and there's only one subject, use that one.
+            # Else, use 'Anonymous'
             subj = entity('Anonymous', 'subject')
             if (len(self.settings.subjects) > 0) or (len(self.ui.subjectList.selectedItems()) > 0):
                 if len(self.ui.subjectList.selectedItems()) > 0:
@@ -536,7 +543,7 @@ class ExperimentWizard(QMainWindow):
             
             try:
                 haveTracker = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, \
-                                      "SOFTWARE\Mirametrix\Tracker")
+                                      "SOFTWARE\Mirametrix")
             except:
                 pass # fail silently        
             if haveTracker: eyetracker = True
@@ -647,6 +654,7 @@ class SettingsDialog(QDialog):
         # misc settings
         self.parent.settings.countdownFrom = self.ui.spinBox.value()
         self.parent.settings.enableEyeTracker = self.ui.eyetrackCheckBox.isChecked()
+        self.parent.settings.useWebcam = self.ui.webcamCheckBox.isChecked()
         
         self.close()
         
@@ -673,6 +681,13 @@ class SettingsDialog(QDialog):
             self.ui.eyetrackCheckBox.setEnabled(True)
             self.parent.settings.eyetracker.calibrate()
             self.parent.settings.haveCalibrated = True
+            
+    def webcam(self):
+        print 'Webcam initialized!'
+        self.parent.settings.webCamCapture=cv.CaptureFromCAM(0)
+        temp = cv.QueryFrame(self.parent.settings.webCamCapture) # TODO: choose desired resolution, frame rate
+        self.parent.settings.videoWriter = cv.CreateVideoWriter("output.avi", -1, 10, cv.GetSize(temp), 1)
+        print self.parent.settings.videoWriter
 
 class Settings:
     def __init__(self, parent):
@@ -716,6 +731,7 @@ class Settings:
         self.enableEyeTracker = False            
         self.haveCalibrated = False    
         self.haveEyeTracker = parent.getKeys()['eyetracker']
+        self.useWebcam = False
         
     def reset(self, parent):
         # prevent some values from being reset
