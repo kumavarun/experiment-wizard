@@ -1,11 +1,15 @@
 from time import time, sleep
 from socket import socket, AF_INET, SOCK_STREAM
+from ctypes import *
+from ctypes import wintypes
+import re, datetime
 
 '''
 Connects to Mirametrix S1 eye tracker
 Send/receive commands via tcp/ip socket
 
 Jeroen Kools, May 10 2011
+Last change: Jan 18 2012
 '''
 
 class tracker:
@@ -20,7 +24,7 @@ class tracker:
         #print '* Socket created' 
         try:
             sock.connect(('localhost', 4242))
-            sock.settimeout(5.0)
+            sock.settimeout(100.0)
         except Exception as e:
             print ' Eyetracker software found, but device seems to be offline!'
             return -1
@@ -28,22 +32,41 @@ class tracker:
     
     def calibrate(self):
         '''Performs calibration sequence, measures error'''
+        
+        freq = c_longlong(0)
+        timev = c_longlong(0)
+        windll.kernel32.QueryPerformanceFrequency(byref(freq))
+        self.timetickfrequency = float(freq.value)
+        
+        windll.kernel32.QueryPerformanceCounter(byref(timev))
+        self.startCPUTime = float(timev.value)
+        self.startWallTime = time.time()
+        
         print '* Calibrating...'
+        a = ''
+        self.calibrated = 0
         try:
             self.sock.send('<SET ID="CALIBRATE_SHOW" STATE="1" />\r\n')
             self.sock.send('<SET ID="CALIBRATE_START" STATE="1" />\r\n')     
             self.sock.send('<GET ID="CALIBRATE_RESULT_SUMMARY" />\r\n')
             a = self.sock.recv(1024)
             while not '"CALIB_RESULT"' in a:
-                a = self.sock.recv(1024)
-                sleep(1)                
-        except:
-            print '* Error during calibration!!'
-        print '* Calibration complete!'
+                b = self.sock.recv(1024)
+                if 'CALIB_RESULT_PT' in b:
+                    self.calibrated += 1
+                a += b
+                time.sleep(0.5)
+        except Exception:
+            print '* Error during calibration: %s'
+        
+        validl = len(re.findall('LV\d="1"',a))
+        validr = len(re.findall('RV\d="1"',a))
+        self.valid = max(validl,validr)
+        self.valid = min(self.calibrated, self.valid)
+        print '* Calibration complete\n %s out of 9 targets done' % self.calibrated
+        print ' Valid: %s/%s' % (self.valid, self.calibrated)
         self.sock.send('<SET ID="CALIBRATE_SHOW" STATE="0" />\r\n')
         self.sock.send('<SET ID="CALIBRATE_START" STATE="0" />\r\n')
-    
-        return self.sock.recv(1024)
     
     #FPOGX float Fixation point-of-gaze X
     #FPOGY float Fixation point-of-gaze Y
@@ -56,6 +79,10 @@ class tracker:
         self.sock.settimeout(None)        
         self.sock.send('<SET ID="ENABLE_SEND_POG_FIX" STATE="1" />\r\n')
         self.sock.send('<SET ID="ENABLE_SEND_TIME" STATE="1" />\r\n')
+        self.sock.send('<SET ID="ENABLE_SEND_TIME_TICK" STATE="1" />\r\n')
+        self.sock.send('<SET ID="ENABLE_SEND_DATA" STATE="1" />\r\n')
+        self.sock.send('<SET ID="ENABLE_SEND_PUPIL_LEFT" STATE="1" />\r\n')
+        self.sock.send('<SET ID="ENABLE_SEND_PUPIL_RIGHT" STATE="1" />\r\n')
         self.sock.send('<SET ID="ENABLE_SEND_GPI" STATE="1" />\r\n')    
     
     def startStim(self,stimname):
@@ -73,7 +100,7 @@ class tracker:
         data = ''
         while True:
             try:
-                data = self.sock.recv(1024)
+                data = self.sock.recv(12000)
             except: break
             #print '--\n', data, '##'
             if stop in data:
@@ -88,6 +115,20 @@ class tracker:
                     all.pop()
                     break                      
         return ''.join(alldata)
+    
+    def convertTime(self, txt):
+        # convert processor tick time to absolute time
+        
+        for n in range(len(txt)):
+            line = txt[n]
+            t = float(line[0])                                            # ticks passed
+            t = (t-self.startCPUTime)/self.timetickfrequency              # seconds passed
+            t = datetime.datetime.fromtimestamp(self.startWallTime+t)     # wall time struct
+            t = "%02i:%02i:%02i.%03i" %\
+                (t.hour, t.minute, t.second, t.microsecond/1000.)         # wall time string
+            txt[n] = (t,) + txt[n][1:]
+            
+        return txt
     
     def getData(self):
         return ''.join(self.trackdata)
