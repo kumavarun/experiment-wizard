@@ -21,7 +21,7 @@ class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.22' ### January 15, 2012
+            self.version = '1.22' ### January 18, 2012
             print 'Starting Experiment Wizard %s' % self.version          
             self.parent = parent
             self.app = app
