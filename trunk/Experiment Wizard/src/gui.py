@@ -105,6 +105,7 @@ class experimentWizardUi(object):
         self.stimDownButton = QtGui.QPushButton(self.stimulusGroupBox)
         self.stimDownButton.setGeometry(QtCore.QRect(140, 290, 31, 23))
         self.stimDownButton.setObjectName("stimDownButton")
+        # TODO: stimulus shuffle button
         self.stimAttr_GroupBox = QtGui.QGroupBox(dialog)
         self.stimAttr_GroupBox.setGeometry(QtCore.QRect(10, 270, 191, 231))
         self.stimAttr_GroupBox.setObjectName("stimAttr_GroupBox")
