@@ -21,7 +21,7 @@ class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.22' ### January 18, 2012
+            self.version = '1.22b' ### January 18, 2012
             print 'Starting Experiment Wizard %s' % self.version          
             self.parent = parent
             self.app = app
@@ -88,7 +88,7 @@ class ExperimentWizard(QMainWindow):
                     print ' Establishing connection to eye tracker..'
                     self.settings.eyetracker = eyetracker.tracker()
                 except:                      # eye tracker installed but not connected
-                    self.settings.haveEyeTracker = False
+                    self.settings.haveEyeTracker = False                    
             print 'Started successfully!'
             
         def reset(self):
@@ -543,7 +543,9 @@ class ExperimentWizard(QMainWindow):
             
             try:
                 haveTracker = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, \
-                                      "SOFTWARE\Mirametrix")
+                                      "SOFTWARE\Mirametrix") or \
+                              _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, \
+                                      "SOFTWARE\Mirametrix\Tracker")
             except:
                 pass # fail silently        
             if haveTracker: eyetracker = True
@@ -730,7 +732,7 @@ class Settings:
         self.countdownFrom = 3  
         self.enableEyeTracker = False            
         self.haveCalibrated = False    
-        self.haveEyeTracker = parent.getKeys()['eyetracker']
+        self.haveEyeTracker = parent.getKeys()['eyetracker'] 
         self.useWebcam = False
         
     def reset(self, parent):

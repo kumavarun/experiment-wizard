@@ -26,7 +26,7 @@ class tracker:
             sock.connect(('localhost', 4242))
             sock.settimeout(100.0)
         except Exception as e:
-            print ' Eyetracker software found, but device seems to be offline!'
+            print ' Eye tracker appears to be offline. If you want to use it, start the tracker first, then restart Experiment Wizard'
             return -1
         return sock
     
