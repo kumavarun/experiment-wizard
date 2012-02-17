@@ -14,14 +14,14 @@ from PyQt4.QtGui import QApplication, QDialog, QComboBox, QDialogButtonBox, \
      QFileDialog, QWidget, QTextEdit, QShortcut, QKeySequence, QMainWindow
 from slideshowDialog import slideshow
 import sys, os, getpass, re, gui, _winreg, subprocess, pickle, datetime, eyetracker
-import cv, time
+import time
 
                 
 class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.22b' ### January 18, 2012
+            self.version = '1.22d' ### Feb 17, 2012
             print 'Starting Experiment Wizard %s' % self.version          
             self.parent = parent
             self.app = app
@@ -88,7 +88,8 @@ class ExperimentWizard(QMainWindow):
                     print ' Establishing connection to eye tracker..'
                     self.settings.eyetracker = eyetracker.tracker()
                 except:                      # eye tracker installed but not connected
-                    self.settings.haveEyeTracker = False                    
+                    self.settings.haveEyeTracker = False   
+                    print ' Can\'t establish connection to eye tracker!'                 
             print 'Started successfully!'
             
         def reset(self):
@@ -270,11 +271,11 @@ class ExperimentWizard(QMainWindow):
         def exit(self):
             try:    del self.slide.vp # prevents crash on exit?
             except: pass
-            if self.settings.useWebcam:
-                try:
-                    del self.settings.videoWriter
-                    del self.settings.webCamCapture
-                except: pass                
+#            if self.settings.useWebcam:
+#                try:
+#                    del self.settings.videoWriter
+#                    del self.settings.webCamCapture
+#                except: pass                
             self.stats.save()
             QApplication.closeAllWindows();
             QApplication.exit()
@@ -656,7 +657,7 @@ class SettingsDialog(QDialog):
         # misc settings
         self.parent.settings.countdownFrom = self.ui.spinBox.value()
         self.parent.settings.enableEyeTracker = self.ui.eyetrackCheckBox.isChecked()
-        self.parent.settings.useWebcam = self.ui.webcamCheckBox.isChecked()
+        #self.parent.settings.useWebcam = self.ui.webcamCheckBox.isChecked()
         
         self.close()
         
@@ -684,12 +685,12 @@ class SettingsDialog(QDialog):
             self.parent.settings.eyetracker.calibrate()
             self.parent.settings.haveCalibrated = True
             
-    def webcam(self):
-        print 'Webcam initialized!'
-        self.parent.settings.webCamCapture=cv.CaptureFromCAM(0)
-        temp = cv.QueryFrame(self.parent.settings.webCamCapture) # TODO: choose desired resolution, frame rate
-        self.parent.settings.videoWriter = cv.CreateVideoWriter("output.avi", -1, 10, cv.GetSize(temp), 1)
-        print self.parent.settings.videoWriter
+#    def webcam(self):
+#        print 'Webcam initialized!'
+#        self.parent.settings.webCamCapture=cv.CaptureFromCAM(0)
+#        temp = cv.QueryFrame(self.parent.settings.webCamCapture) # TODO: choose desired resolution, frame rate
+#        self.parent.settings.videoWriter = cv.CreateVideoWriter("output.avi", -1, 10, cv.GetSize(temp), 1)
+#        print self.parent.settings.videoWriter
 
 class Settings:
     def __init__(self, parent):
@@ -733,7 +734,7 @@ class Settings:
         self.enableEyeTracker = False            
         self.haveCalibrated = False    
         self.haveEyeTracker = parent.getKeys()['eyetracker'] 
-        self.useWebcam = False
+        #self.useWebcam = False
         
     def reset(self, parent):
         # prevent some values from being reset
