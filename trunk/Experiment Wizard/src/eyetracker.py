@@ -1,8 +1,7 @@
-from time import time, sleep
 from socket import socket, AF_INET, SOCK_STREAM
 from ctypes import *
 from ctypes import wintypes
-import re, datetime
+import re, datetime, time
 
 '''
 Connects to Mirametrix S1 eye tracker
@@ -17,7 +16,6 @@ class tracker:
         self.data = ''
         self.sock = self.connect()
         self.trackdata = []
-        raise
                 
     def connect(self):
         sock = socket(AF_INET, SOCK_STREAM)
@@ -56,8 +54,8 @@ class tracker:
                     self.calibrated += 1
                 a += b
                 time.sleep(0.5)
-        except Exception:
-            print '* Error during calibration: %s'
+        except Exception as e:
+            print '* Error during calibration: %s' % e
         
         validl = len(re.findall('LV\d="1"',a))
         validr = len(re.findall('RV\d="1"',a))
@@ -130,7 +128,7 @@ class tracker:
             
         return txt
     
-    def getData(self):
+    def getData(self): 
         return ''.join(self.trackdata)
     
     def clean(self):

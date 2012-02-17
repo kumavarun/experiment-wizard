@@ -21,8 +21,7 @@ from PyQt4.phonon import Phonon # Qt media library
 from ctypes import byref, c_char_p, c_double, c_uint, c_ulong, cdll
 from fourier import doFFT
 from gui import slideshowUi
-from re import match
-import os, time, random, cv
+import os, time, random, re#, cv
 libc = cdll.msvcrt # load C library
 EDK_loaded = True
 
@@ -85,7 +84,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
             if 'space' in settings.masklength:
                 self.maskLength = 60e3
             else:
-                m = match('[\d\.]+', settings.masklength)            
+                m = re.match('[\d\.]+', settings.masklength)            
                 self.maskLength = int(1000*float(m.group()))
         
         self.subject = subject
@@ -186,12 +185,12 @@ class slideshow(QtGui.QFrame, slideshowUi):
 
         self.countdownTimer.start(1000)
         
-        if self.settings.useWebcam:
-            self.webcamTimer = QtCore.QTimer(self)
-            self.webcamFramesWritten = 0
-            self.connect(self.webcamTimer,
-                     QtCore.SIGNAL("timeout()"),
-                     self.getWebcamFrame)
+#        if self.settings.useWebcam:
+#            self.webcamTimer = QtCore.QTimer(self)
+#            self.webcamFramesWritten = 0
+#            self.connect(self.webcamTimer,
+#                     QtCore.SIGNAL("timeout()"),
+#                     self.getWebcamFrame)
         
         self.movieSegmentTimer = QtCore.QTimer(self)
         self.connect(self.movieSegmentTimer,
@@ -266,17 +265,17 @@ class slideshow(QtGui.QFrame, slideshowUi):
             self.atImage = 0
             self.countdownTimer.stop()
             self.timer.start(self.millis_per_img+self.delay)
-            if self.settings.useWebcam:
-                self.webcamTimer.start(100)
+#            if self.settings.useWebcam:
+#                self.webcamTimer.start(100)
             self.t0 = time.time()
             self.update_image()
             
-    def getWebcamFrame(self):       
-        self.webcamTimer.start(100)
-        image=cv.QueryFrame(self.settings.webCamCapture)
-        cv.WriteFrame(self.settings.videoWriter, image)
-        cv.WaitKey(2)
-        self.webcamFramesWritten += 1
+#    def getWebcamFrame(self):       
+#        self.webcamTimer.start(100)
+#        image=cv.QueryFrame(self.settings.webCamCapture)
+#        cv.WriteFrame(self.settings.videoWriter, image)
+#        cv.WaitKey(2)
+#        self.webcamFramesWritten += 1
 
     # file type checks, used by list filters
     def isRecord(self,i):
@@ -506,11 +505,11 @@ class slideshow(QtGui.QFrame, slideshowUi):
                     self.settings.eyetracker.getData()
             self.writeOutput()
             
-            if self.settings.useWebcam:
-                self.webcamTimer.stop()
-                td = time.time() - self.t0
-                del self.settings.videoWriter
-                print 'Recorded %i webcam frames in %.3f seconds, %.1f fps' % (self.webcamFramesWritten, td, self.webcamFramesWritten/td)
+#            if self.settings.useWebcam:
+#                self.webcamTimer.stop()
+#                td = time.time() - self.t0
+#                del self.settings.videoWriter
+#                print 'Recorded %i webcam frames in %.3f seconds, %.1f fps' % (self.webcamFramesWritten, td, self.webcamFramesWritten/td)
                         
     def writeOutput(self):
             ##############################################
@@ -632,32 +631,36 @@ class slideshow(QtGui.QFrame, slideshowUi):
                     channeldata = ';'.join(channeldata)
                     self.raw.write(indexstimname+channeldata+'\n')
             
-            print 'Done!'
-                        
+            print 'Done!'                        
             
         if self.settings.enableEyeTracker:
             eyetrackname = self.outputdir+self.subject.name+self.date+'.eye'
             eyetrackfile = open(eyetrackname,'w')
             from win32api import GetSystemMetrics
-            import re
             width = GetSystemMetrics (0) # TODO: use self.ui.resolution
             height = GetSystemMetrics (1)
             txtcoords = re.findall(\
-                r'FPOGX="([\d\.-]*).*FPOGY="([\d\.-]*).*FPOGV="1" GPI1="([^"]*)',\
+                r'TIME_TICK="([\d\.-]*).*FPOGX="([\d\.-]*).*FPOGY="([\d\.-]*).*FPOGV="1".*LPD="([\d\.-]*).*RPD="([\d\.-]*).*GPI1="([^"]*)',\
                 self.trackerData)
+            txtcoords = self.settings.eyetracker.convertTime(txtcoords)
+            print '* %s POG coordinates found in data' % len(txtcoords)
+            
             if len(txtcoords)>0:
-                prevname = txtcoords[0][2];
+                eyetrackfile.write('TIME\tX\tY\tLEFT PUPIL\tRIGHT PUPIL\tSTIMULUS\n')
+                prevname = txtcoords[0][5];
                 im = 1      
                 for i in range(len(txtcoords)):
-                    [x,y,name] = txtcoords[i]
+                    [t,x,y, leftpupil, rightpupil, name] = txtcoords[i]         
+                    
                     if name != prevname: 
                         im += 1
-                        prevname = name
-                        
-                    #print i, name, im   
-                    fixed = [os.path.basename(name), float(x)*width, float(y)*height]     
-                    fixed[1] = str(int( fixed[1] + 0.5 * (self.imageSize[im].width() - width)    ))
-                    fixed[2] = str(int( fixed[2] + 0.5 * (self.imageSize[im].height() - height)  ))
+                        prevname = name           
+  
+                    fixed = [t,
+                              str(int(float(x)*width)),  #str(int( float(x) + 0.5 * (self.imageSize[im].width() - width)    )),
+                              str(int(float(y)*height)), #str(int( float(y) + 0.5 * (self.imageSize[im].height() - height)  )),
+                             leftpupil, rightpupil, name]    
+
                     eyetrackfile.write('\t'.join(fixed)+'\n')
                 
             eyetrackfile.close()            
@@ -755,7 +758,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
     # called with Escape or by errors
     def quitApp(self):
         self.timer.stop()
-        self.webcamTimer.stop()
+        #self.webcamTimer.stop()
         self.countdownTimer.stop()
         self.movieSegmentTimer.stop()
         self.vp.stop()
