@@ -287,8 +287,11 @@ class slideshow(QtGui.QFrame, slideshowUi):
         self.timer.start(self.millis_per_img+self.delay)
         self.movieSegmentTimer.stop()
         self.displaytime = time.clock()
-        self.disp.setText("")
         self.disp.clear() # clear previous image
+        if self.nextPhase == "done!":
+            self.disp.setText('All stimuli presented, saving data...')
+        else:
+            self.disp.setText("")        
         self.vp.hide()
         
         #print self.atImage, self.nextPhase
@@ -517,7 +520,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
             # and perform Fourier transformation         #
             ##############################################
         
-        print 'Saving data...'
+        self.disp.setText('Processing data...')
         wavebands = ['avg', 'alpha', 'beta', 'delta', 'theta']
 
         if self.online or self.recordKeys:
