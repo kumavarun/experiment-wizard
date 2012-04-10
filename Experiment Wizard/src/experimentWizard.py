@@ -21,7 +21,7 @@ class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.22d' ### Feb 17, 2012
+            self.version = '1.23' ### April 10, 2012
             print 'Starting Experiment Wizard %s' % self.version          
             self.parent = parent
             self.app = app
@@ -542,6 +542,7 @@ class ExperimentWizard(QMainWindow):
             except:
                 testbench = edk # use EDK path, since there is no separate reg entry in 1.0.0.4
             
+            # TODO: make this work for all versions!
             try:
                 haveTracker = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, \
                                       "SOFTWARE\Mirametrix") or \
