@@ -724,8 +724,9 @@ class slideshow(QtGui.QFrame, slideshowUi):
             self.alldata.append(stimdata)
             self.movieSegmentTimer.start(self.millis_per_img)    
             if self.settings.enableEyeTracker:
-                stimname = self.images[self.atImage].name
-                self.settings.eyetracker.startStim(os.path.basename("%s %s" % (stimname, self.movieSegment)))
+                self.settings.eyetracker.stopStim()
+                stimname = self.images[self.atImage-1].name
+                self.settings.eyetracker.startStim(os.path.basename("%s" % stimname))
 
             # reset necessary values
             self.movieSegment += 1
