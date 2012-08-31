@@ -2,6 +2,7 @@ from socket import socket, AF_INET, SOCK_STREAM
 from ctypes import *
 from ctypes import wintypes
 import re, datetime, time
+import threading
 
 '''
 Connects to Mirametrix S1 eye tracker
@@ -15,7 +16,8 @@ class tracker:
     def __init__(self):
         self.data = ''
         self.sock = self.connect()
-        self.trackdata = []
+        self.repeater = RepeatTimer(self)
+        self.repeater.daemon = True
                 
     def connect(self):
         sock = socket(AF_INET, SOCK_STREAM)
@@ -81,38 +83,18 @@ class tracker:
         self.sock.send('<SET ID="ENABLE_SEND_DATA" STATE="1" />\r\n')
         self.sock.send('<SET ID="ENABLE_SEND_PUPIL_LEFT" STATE="1" />\r\n')
         self.sock.send('<SET ID="ENABLE_SEND_PUPIL_RIGHT" STATE="1" />\r\n')
-        self.sock.send('<SET ID="ENABLE_SEND_GPI" STATE="1" />\r\n')    
-    
-    def startStim(self,stimname):
+        self.sock.send('<SET ID="ENABLE_SEND_GPI" STATE="1" />\r\n')
         self.sock.send('<SET ID="ENABLE_SEND_DATA" STATE="1" />\r\n')
         self.sock.send('<SET ID="GPI_NUMBER" VALUE="1" />\r\n')    
-        self.sock.send('<SET ID="GPI1" VALUE="%s" />\r\n' % stimname)        
+    
+    def startStim(self,stimname):            
+        self.sock.send('<SET ID="GPI1" VALUE="%s" />\r\n' % stimname)
         
     def stopStim(self):
+        self.sock.send('<SET ID="GPI1" VALUE="INTERVAL" />\r\n') 
+        
+    def stopRecording(self):
         self.sock.send('<SET ID="ENABLE_SEND_DATA" STATE="0" />\r\n')
-        self.trackdata.append(self.collectData()) 
-    
-    def collectData(self):
-        stop = '<ACK ID="ENABLE_SEND_DATA" STATE="0" />'
-        alldata = []
-        data = ''
-        while True:
-            try:
-                data = self.sock.recv(12000)
-            except: break
-            #print '--\n', data, '##'
-            if stop in data:
-                alldata.append(data[:data.find(stop)])
-                break
-            alldata.append(data)
-            if len(alldata)>1:
-                #check if stop was split
-                last_pair = alldata[-2] + alldata[-1]
-                if stop in last_pair:
-                    alldata[-2]=last_pair[:last_pair.find(stop)]
-                    alldata.pop()
-                    break                      
-        return ''.join(alldata)
     
     def convertTime(self, txt):
         # convert processor tick time to absolute time
@@ -129,8 +111,73 @@ class tracker:
         return txt
     
     def getData(self): 
-        return ''.join(self.trackdata)
+        return self.repeater.getData()
     
     def clean(self):
         self.data = ''
         self.trackdata = []
+        self.repeater = RepeatTimer(self)
+        self.repeater.daemon = True
+        
+class RepeatTimer(threading.Thread): 
+    def __init__(self, parent): 
+        threading.Thread.__init__(self)
+        self.event = threading.Event()
+        self.conn = parent.sock 
+        self.alldata = []
+        self.stopline = 'ACK ID="ENABLE_SEND_DATA" STATE="0"'
+        self.running = False
+        self.nodata = 0
+        self.parent = parent
+        
+    def run(self): 
+        while not self.event.is_set():
+            self.running = True
+            try:
+                data = self.conn.recv(12000) # every entry is 130 chars, ~60 entries per second
+            except Exception as e:
+                print 'Exception during data collection: %s' % e
+                self.parent.statustext.set("Connection Lost!")
+                self.parent.status.config(fg="#ffffff", bg="ff0000")
+                self.stop()
+                return
+            
+            if data.count('FPOGV="0"') > data.count('FPOGV="1"'):
+                if self.nodata < 10:
+                    self.parent.statustext.set("Can't find eyes!")
+                else:
+                    seconds = self.nodata / 10
+                    self.parent.statustext.set("Can't find eyes! (>%is)" % seconds)
+                self.parent.status.config(fg="#ffffff", bg="#ff0000")
+                if data.count('FPOGV="1"') == 0:
+                    self.nodata += 1
+                else:
+                    self.nodata = 0
+            else:
+                self.parent.statustext.set("Recording")
+                self.parent.status.config(fg="#ffffff",  bg="#008800")                
+                
+            if self.stopline in data:
+                self.alldata.append(data[:data.find(self.stopline)])
+                self.stop()
+                return
+            
+            self.alldata.append(data)
+            
+            if len(self.alldata)>1:
+                #check if stop was split
+                last_pair = self.alldata[-2] + self.alldata[-1]
+                if self.stopline in last_pair:
+                    self.alldata[-2]=last_pair[:last_pair.find(self.stopline)]
+                    self.alldata.pop() # trash last entry past stop
+                    return
+            
+            self.event.wait(.1) 
+            
+    def getData(self):
+        return ''.join(self.alldata)
+    
+    def stop(self):
+        if self.running: 
+            self.running = False
+        self.event.set()  
