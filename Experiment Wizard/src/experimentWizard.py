@@ -21,7 +21,7 @@ class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.24' ### April 10, 2012
+            self.version = '1.25' ### April 12, 2012
             print 'Starting Experiment Wizard %s' % self.version          
             self.parent = parent
             self.app = app
@@ -41,6 +41,7 @@ class ExperimentWizard(QMainWindow):
             self.ui.setupUi(self)
             print ' Loading configuration..'
             self.settings = Settings(self)
+            self.recordTime = -1
             self.deletedStim = -1           # index of last deleted stimulus
             self.deletedSubj = -1           # index of last deleted subject
             self.lastOpenFolder = ''        # remember and use last stimulus folder
@@ -485,10 +486,15 @@ class ExperimentWizard(QMainWindow):
                 self.settings.update(self)
 
         def runExperiment(self):
+            # If no stimuli are listed, prompt for duration recording
+            if len(self.settings.stimuli) == 0 and self.recordTime == -1:
+                self.prompt = RecordTimeDialog(self)
+                self.prompt.show()
+                return    
+            
             self.statusbar.showMessage("Starting experiment...", 3000)
             self.settings.hasRunExperiment = True
-            self.settings.update(self) 
-
+            self.settings.update(self)            
 
             # Try to use selected subject; if that doesn't work
             # and there's only one subject, use that one.
@@ -502,12 +508,11 @@ class ExperimentWizard(QMainWindow):
                 elif len(self.settings.subjects) == 1:
                     subj = self.settings.subjects[0]
 
-            if len(self.settings.stimuli) > 0:
-                self.slide = slideshow(subj, self.settings, self.app)
-                self.slide.show()
-                self.slide.setFocus() 
-                self.stats.experimentsRun += 1
-                self.stats.stimuliDisplayed += len(self.settings.stimuli)
+            self.slide = slideshow(subj, self.settings, self.recordTime, self.app)
+            self.slide.show()
+            self.slide.setFocus() 
+            self.stats.experimentsRun += 1
+            self.stats.stimuliDisplayed += len(self.settings.stimuli)
         
         # Menu methods
         
@@ -602,6 +607,22 @@ class ExperimentWizard(QMainWindow):
             self.statsWindow.show()
             
 
+class RecordTimeDialog(QDialog):
+    def __init__(self, parent):
+        QWidget.__init__(self,parent)
+        self.ui = gui.recordTimeUi()
+        self.ui.setupUi(self)  
+        self.parent = parent        
+            
+    def accept(self):
+        self.parent.recordTime = self.ui.minuteSpinBox.value()*60 + self.ui.secondsSpinBox.value()
+        self.close()
+        self.parent.runExperiment()
+        
+    def reject(self):
+        self.parent.recordTime = 0
+        self.close()
+
 class SettingsDialog(QDialog):
     def __init__(self, parent):
         QWidget.__init__(self,parent)
@@ -685,13 +706,7 @@ class SettingsDialog(QDialog):
             self.ui.eyetrackCheckBox.setEnabled(True)
             self.parent.settings.eyetracker.calibrate()
             self.parent.settings.haveCalibrated = True
-            
-#    def webcam(self):
-#        print 'Webcam initialized!'
-#        self.parent.settings.webCamCapture=cv.CaptureFromCAM(0)
-#        temp = cv.QueryFrame(self.parent.settings.webCamCapture) # TODO: choose desired resolution, frame rate
-#        self.parent.settings.videoWriter = cv.CreateVideoWriter("output.avi", -1, 10, cv.GetSize(temp), 1)
-#        print self.parent.settings.videoWriter
+
 
 class Settings:
     def __init__(self, parent):

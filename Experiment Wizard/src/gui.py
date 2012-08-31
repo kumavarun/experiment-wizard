@@ -12,6 +12,11 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.phonon import Phonon
 import textwrap
 
+try:
+    _fromUtf8 = QtCore.QString.fromUtf8
+except AttributeError:
+    _fromUtf8 = lambda s: s
+    
 class attributeEditorUi(object):
     def setupUi(self, editAttributeDialog):
         editAttributeDialog.setObjectName("editAttributeDialog")
@@ -396,6 +401,7 @@ class slideshowUi(object):
         self.disp.setAlignment(QtCore.Qt.AlignCenter)
         self.disp.setFont(QtGui.QFont('Arial', 60)) # big letters
         self.disp.setWordWrap(True)
+        self.disp.setCursor(QtCore.Qt.BlankCursor)
         #self.disp.setScaledContents(True)
         self.resolution = QtGui.QDesktopWidget().availableGeometry()
         self.layout = QtGui.QGridLayout(self)
@@ -415,8 +421,11 @@ class VideoPlayer(Phonon.VideoPlayer):
         Phonon.VideoPlayer.__init__(self)
         self.connect(self, QtCore.SIGNAL("finished()"), self.quit)        
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
-        self.videoWidget().setScaleMode(1)
+        #self.videoWidget().setFullScreen(1)
+        self.videoWidget().setScaleMode(0)
         self.setFocus()
+        self.setCursor(QtCore.Qt.BlankCursor)
+        self.videoWidget().setCursor(QtCore.Qt.BlankCursor)
         self.parent = parent       
         QtGui.QShortcut(QtGui.QKeySequence("Space"), self,QtCore.SIGNAL("finished()"))
         #QtGui.QShortcut(QtGui.QKeySequence("Space"), self,self.space())
@@ -712,7 +721,47 @@ class statsUi(object):
         self.label_3.setText(QtGui.QApplication.translate("Dialog", "Installed:", None, QtGui.QApplication.UnicodeUTF8))
         self.label_4.setText(QtGui.QApplication.translate("Dialog", "Total running time:", None, QtGui.QApplication.UnicodeUTF8))
         
+class recordTimeUi(object):
+    def setupUi(self, RecordTimeDialog):
+        RecordTimeDialog.setObjectName(_fromUtf8("RecordTimeDialog"))
+        RecordTimeDialog.resize(367, 187)
+        RecordTimeDialog.setWindowTitle(QtGui.QApplication.translate("RecordTimeDialog", "Experiment Wizard", None, QtGui.QApplication.UnicodeUTF8))
+        self.buttonBox = QtGui.QDialogButtonBox(RecordTimeDialog)
+        self.buttonBox.setGeometry(QtCore.QRect(20, 150, 331, 32))
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Cancel|QtGui.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName(_fromUtf8("buttonBox"))
+        self.label = QtGui.QLabel(RecordTimeDialog)
+        self.label.setGeometry(QtCore.QRect(10, 10, 351, 61))
+        self.label.setText(QtGui.QApplication.translate("RecordTimeDialog", "You did not list any stimuli for this experiment. If you want to make a recording anyway (e.g. if you present stimuli outside Experiment Wizard), please enter the desired recording duration below.", None, QtGui.QApplication.UnicodeUTF8))
+        self.label.setAlignment(QtCore.Qt.AlignJustify|QtCore.Qt.AlignVCenter)
+        self.label.setWordWrap(True)
+        self.label.setMargin(6)
+        self.label.setObjectName(_fromUtf8("label"))
+        self.label_3 = QtGui.QLabel(RecordTimeDialog)
+        self.label_3.setGeometry(QtCore.QRect(90, 80, 81, 21))
+        self.label_3.setText(QtGui.QApplication.translate("RecordTimeDialog", "Minutes", None, QtGui.QApplication.UnicodeUTF8))
+        self.label_3.setObjectName(_fromUtf8("label_3"))
+        self.minuteSpinBox = QtGui.QSpinBox(RecordTimeDialog)
+        self.minuteSpinBox.setGeometry(QtCore.QRect(30, 80, 51, 22))
+        self.minuteSpinBox.setMaximum(300)
+        self.minuteSpinBox.setObjectName(_fromUtf8("minuteSpinBox"))
+        self.secondsSpinBox = QtGui.QSpinBox(RecordTimeDialog)
+        self.secondsSpinBox.setGeometry(QtCore.QRect(30, 110, 51, 22))
+        self.secondsSpinBox.setMaximum(59)
+        self.secondsSpinBox.setObjectName(_fromUtf8("secondsSpinBox"))
+        self.label_4 = QtGui.QLabel(RecordTimeDialog)
+        self.label_4.setGeometry(QtCore.QRect(90, 110, 81, 21))
+        self.label_4.setText(QtGui.QApplication.translate("RecordTimeDialog", "Seconds", None, QtGui.QApplication.UnicodeUTF8))
+        self.label_4.setObjectName(_fromUtf8("label_4"))
 
+        self.retranslateUi(RecordTimeDialog)
+        QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL(_fromUtf8("accepted()")), RecordTimeDialog.accept)
+        QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL(_fromUtf8("rejected()")), RecordTimeDialog.reject)
+        QtCore.QMetaObject.connectSlotsByName(RecordTimeDialog)
+
+    def retranslateUi(self, RecordTimeDialog):
+        pass
 
 class Icons(object):
     def __init__(self, parent = None):
