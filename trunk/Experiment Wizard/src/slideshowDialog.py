@@ -39,7 +39,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
     audiotypes = "*.mp3 *.wav"    
     mediatypes = movietypes+' '+audiotypes
     
-    def __init__(self,subject, settings, app):
+    def __init__(self,subject, settings, recordTime, app):
         print '\n***** Starting experiment! ******' 
         QtGui.QFrame.__init__(self)
         self.settings = settings
@@ -119,6 +119,8 @@ class slideshow(QtGui.QFrame, slideshowUi):
         self.responsetime = 0
         self.movieSamples = 0
         self.totalSamples = 0
+        
+        self.recordTime = recordTime
 
         self.channelnames = ['AF3','F7','F3','FC5',\
                         'T7','P7','O1','O2','P8','T8',\
@@ -176,6 +178,11 @@ class slideshow(QtGui.QFrame, slideshowUi):
         self.connect(self.timer,
                      QtCore.SIGNAL("timeout()"),
                      self.update_image)
+        
+        self.nostimTimer = QtCore.QTimer(self)
+        self.connect(self.nostimTimer,
+                     QtCore.SIGNAL("timeout()"),
+                     self.doRecordTime)
 
         # countdown timer
         self.countdownTimer = QtCore.QTimer(self)
@@ -183,15 +190,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
                      QtCore.SIGNAL("timeout()"),
                      self.countdown)
 
-        self.countdownTimer.start(1000)
-        
-#        if self.settings.useWebcam:
-#            self.webcamTimer = QtCore.QTimer(self)
-#            self.webcamFramesWritten = 0
-#            self.connect(self.webcamTimer,
-#                     QtCore.SIGNAL("timeout()"),
-#                     self.getWebcamFrame)
-        
+        self.countdownTimer.start(1000)        
         self.movieSegmentTimer = QtCore.QTimer(self)
         self.connect(self.movieSegmentTimer,
                      QtCore.SIGNAL("timeout()"),
@@ -264,24 +263,31 @@ class slideshow(QtGui.QFrame, slideshowUi):
 
             self.atImage = 0
             self.countdownTimer.stop()
-            self.timer.start(self.millis_per_img+self.delay)
-#            if self.settings.useWebcam:
-#                self.webcamTimer.start(100)
             self.t0 = time.time()
-            self.update_image()
             
-#    def getWebcamFrame(self):       
-#        self.webcamTimer.start(100)
-#        image=cv.QueryFrame(self.settings.webCamCapture)
-#        cv.WriteFrame(self.settings.videoWriter, image)
-#        cv.WaitKey(2)
-#        self.webcamFramesWritten += 1
+            self.t0 = time.time()
+            if self.recordTime == -1:
+                self.timer.start(self.millis_per_img+self.delay)
+                self.update_image()
+            else:
+                print 'nostim$$$$$$$$$$$$$$$$$$$$$$$$$$$$'
+                self.nostimTimer.start(self.millis_per_img+self.delay)
+                self.doRecordTime()
 
     # file type checks, used by list filters
     def isRecord(self,i):
         if '.csv' in str(i):
             return True
         return False
+    
+    def doRecordTime(self):
+        print 'BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+        if (time.time() - self.t0) > self.recordTime:
+            self.nostimTimer.stop()
+            self.writeOutput()
+            return 
+        self.nostimTimer.start(self.millis_per_img+self.delay)
+        self.disp.setText("")
 
     def update_image(self):
         self.timer.start(self.millis_per_img+self.delay)
@@ -293,9 +299,6 @@ class slideshow(QtGui.QFrame, slideshowUi):
         else:
             self.disp.setText("")        
         self.vp.hide()
-        
-        #print self.atImage, self.nextPhase
-            
         
         # collect data from device buffer
         # only do this here for images, for video this is done per
@@ -363,8 +366,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
                 stimdata['attributes'] = self.images[self.atImage-1].attributes
                 stimdata['response'] = self.response
                 stimdata['responsetime'] = self.responsetime
-                stimdata['name'] = self.images[self.atImage-1].name   
-                
+                stimdata['name'] = self.images[self.atImage-1].name          
                 
                 # store results in alldata list          
                 if not self.playingAV:
@@ -408,7 +410,8 @@ class slideshow(QtGui.QFrame, slideshowUi):
                     self.nextPhase = "interval"
                     print 'Presenting %s' % os.path.basename(stimname)
                     self.playingAV = True
-                    media = Phonon.MediaSource(stimname)                 
+                    media = Phonon.MediaSource(stimname)
+                    self.vp.videoWidget().setFullScreen(1)                 
                     self.vp.load(media)
                     self.timer.stop()       
                     self.movieSegmentTimer.start(self.millis_per_img)
@@ -451,15 +454,16 @@ class slideshow(QtGui.QFrame, slideshowUi):
                     action = False
                 elif self.nextPhase =='stimulus' and action:
                     print 'Presenting %s' % os.path.basename(stimname)
-                    stimulus = QtGui.QMovie(stimname,QtCore.QByteArray(), self)    
-                    #stimulus = QtGui.QPixmap(stimname)  
-                    #if stimulus.height() > self.resolution.height():  
-                    #    stimulus = stimulus.scaledToHeight(self.resolution.height())
-                    #elif stimulus.width() > self.resolution.width():
-                    #    stimulus = stimulus.scaledToWidth(self.resolution.width())
-                    #self.disp.setPixmap(stimulus)
-                    self.disp.setMovie(stimulus)
-                    stimulus.start()
+                    
+                    stimulus = QtGui.QPixmap(stimname)  
+                    if stimulus.height() > self.resolution.height():  
+                        stimulus = stimulus.scaledToHeight(self.resolution.height())
+                    elif stimulus.width() > self.resolution.width():
+                        stimulus = stimulus.scaledToWidth(self.resolution.width())
+                    self.disp.setPixmap(stimulus)
+                    #stimulus = QtGui.QMovie(stimname,QtCore.QByteArray(), self)    
+                    #self.disp.setMovie(stimulus)
+                    #stimulus.start()
                     if self.settings.masking != 'None': 
                         self.nextPhase = "mask"
                     else: 
@@ -502,18 +506,19 @@ class slideshow(QtGui.QFrame, slideshowUi):
         else:
             print '\nAll stimuli presented!'
             self.disp.setText('')
+            self.vp.videoWidget().setFullScreen(0)
             if self.settings.enableEyeTracker:
                 self.settings.eyetracker.stopStim()
                 self.trackerData = 'Tracker data:\n'+\
                     self.settings.eyetracker.getData()
             self.writeOutput()
-            
+             
 #            if self.settings.useWebcam:
 #                self.webcamTimer.stop()
 #                td = time.time() - self.t0
 #                del self.settings.videoWriter
 #                print 'Recorded %i webcam frames in %.3f seconds, %.1f fps' % (self.webcamFramesWritten, td, self.webcamFramesWritten/td)
-                        
+                                   
     def writeOutput(self):
             ##############################################
             # Save data recorded in self.alldata to file #

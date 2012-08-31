@@ -110,7 +110,7 @@ class tracker:
                 last_pair = alldata[-2] + alldata[-1]
                 if stop in last_pair:
                     alldata[-2]=last_pair[:last_pair.find(stop)]
-                    all.pop()
+                    alldata.pop()
                     break                      
         return ''.join(alldata)
     
