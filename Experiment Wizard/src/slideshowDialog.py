@@ -270,7 +270,6 @@ class slideshow(QtGui.QFrame, slideshowUi):
                 self.timer.start(self.millis_per_img+self.delay)
                 self.update_image()
             else:
-                print 'nostim$$$$$$$$$$$$$$$$$$$$$$$$$$$$'
                 self.nostimTimer.start(self.millis_per_img+self.delay)
                 self.doRecordTime()
 
@@ -281,6 +280,7 @@ class slideshow(QtGui.QFrame, slideshowUi):
         return False
     
     def doRecordTime(self):
+        # unfinished
         print 'BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
         if (time.time() - self.t0) > self.recordTime:
             self.nostimTimer.stop()
