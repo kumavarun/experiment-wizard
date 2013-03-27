@@ -22,6 +22,7 @@ from ctypes import byref, c_char_p, c_double, c_uint, c_ulong, cdll
 from fourier import doFFT
 from gui import slideshowUi
 import os, time, random, re#, cv
+import datetime
 libc = cdll.msvcrt # load C library
 EDK_loaded = True
 
@@ -601,7 +602,11 @@ class slideshow(QtGui.QFrame, slideshowUi):
                         arff = ','.join([arff,str(val)])
                 if self.recordKeys:
                     r = str(stimulus['response'])
-                    rs = str('%.3f' % stimulus['responsetime'])
+                    if self.settings.wallTime:
+                        rs = stimulus['responsetime']
+                    else:
+                        rs = str('%.3f' % stimulus['responsetime'])
+                        
                     csv = sep.join([csv,r,rs])
                     arff = ','.join([arff,r,rs])
                 if self.online:
@@ -741,8 +746,11 @@ class slideshow(QtGui.QFrame, slideshowUi):
 
     def keyPressEvent(self, event):
         if type(event) == QtGui.QKeyEvent:
-            self.haveHadKeypresses = True            
-            responsetime = time.clock() - self.displaytime
+            self.haveHadKeypresses = True         
+            if self.settings.wallTime:
+                responsetime = str(datetime.datetime.now())[:-3]
+            else:      
+                responsetime = time.clock() - self.displaytime
             resp = str(event.text()).upper()
             #print 'keypress ', resp, str(event.key()).upper()
             if resp == ' ':
