@@ -21,7 +21,7 @@ class ExperimentWizard(QMainWindow):
         def __init__(self, app, parent=None):
             QMainWindow.__init__(self)
             
-            self.version = '1.26' ### August 31, 2012
+            self.version = '1.27' ### March 27, 2013
             print 'Starting Experiment Wizard %s' % self.version          
             self.parent = parent
             self.app = app
@@ -311,7 +311,8 @@ class ExperimentWizard(QMainWindow):
             out.write('saveRaw=%s\n' % str(self.settings.saveRawEEG))
             out.write('CSVseparator=%s\n' % str(self.settings.CSVseparator))
             out.write('outputPrefix=%s\n' % str(self.settings.outputPrefix))
-            out.write('outputFolder=%s\n' % str(self.settings.outputFolder) )           
+            out.write('outputFolder=%s\n' % str(self.settings.outputFolder) )  
+            out.write('wallTime=%s\n' % str(self.settings.wallTime))         
             
             out.write('maskFolder=%s\n' % str(self.settings.maskfolder))
             out.write('maskLength=%s\n' % str(self.settings.masklength))
@@ -406,6 +407,8 @@ class ExperimentWizard(QMainWindow):
                     self.settings.outputPrefix = val
                 if var == 'outputFolder':
                     self.settings.outputFolder = val
+                if var == 'wallTime':
+                    self.settings.wallTime = (val == 'True')
                 
                 if var == 'maskFolder':
                     self.settings.maskfolder = val
@@ -656,6 +659,7 @@ class SettingsDialog(QDialog):
         self.ui.calibrateButton.setEnabled(self.parent.settings.haveEyeTracker)
         self.ui.eyetrackCheckBox.setChecked(self.parent.settings.enableEyeTracker)
         self.ui.eyetrackCheckBox.setEnabled(self.parent.settings.haveCalibrated)
+        self.ui.wallTimeCheckBox.setChecked(self.parent.settings.wallTime)
         
     def accept(self):
         self.parent.statusBar().showMessage('Settings changed', 2000)
@@ -680,6 +684,7 @@ class SettingsDialog(QDialog):
         self.parent.settings.countdownFrom = self.ui.spinBox.value()
         self.parent.settings.enableEyeTracker = self.ui.eyetrackCheckBox.isChecked()
         #self.parent.settings.useWebcam = self.ui.webcamCheckBox.isChecked()
+        self.parent.settings.wallTime = self.ui.wallTimeCheckBox.isChecked()
         
         self.close()
         
@@ -750,6 +755,7 @@ class Settings:
         self.enableEyeTracker = False            
         self.haveCalibrated = False    
         self.haveEyeTracker = parent.getKeys()['eyetracker'] 
+        self.wallTime = False
         #self.useWebcam = False
         
     def reset(self, parent):
